@@ -1,0 +1,27 @@
+# Build output
+/build/
+result
+result-*
+
+# Agent artifacts
+.claude/
+.cursor/
+.aider*
+.continue/
+.windsurf/
+.codeium/
+*.agent.md
+
+# Environment
+.direnv/
+.env
+.env.*
+*.local
+
+# Editor and OS junk
+.idea/
+.vscode/
+*.swp
+.DS_Store
+.cache/
+*.log

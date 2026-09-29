@@ -1,0 +1,2 @@
+option('signature_fonts', type: 'string', value: '', description: 'Directory holding the signature script fonts')
+option('fallback_fonts', type: 'string', value: '', description: 'Directory of metric-compatible fallback fonts')

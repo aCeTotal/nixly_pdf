@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Nixly PDF
+GenericName=PDF Editor
+Comment=Read, edit and sign PDF documents
+Exec=nixly-pdf %f
+Icon=nixly-pdf
+Terminal=false
+Categories=Office;Viewer;Graphics;
+MimeType=application/pdf;
