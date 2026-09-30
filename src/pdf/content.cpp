@@ -1,11 +1,14 @@
 #include "content.h"
 
 #include <QByteArray>
+#include <algorithm>
 #include <cmath>
+#include <cstring>
 
 namespace {
 
 constexpr float kOriginTolerance = 0.35f;
+constexpr const char *kInline = "<inline>";
 
 struct Rewrite
 {
@@ -22,6 +25,16 @@ int dropGlyph(fz_context *, void *opaque, int *, int, fz_matrix trm, fz_matrix c
             return 1;
     }
     return 0;
+}
+
+// Drops lifted images only.
+fz_image *dropImage(fz_context *ctx, void *opaque, fz_matrix ctm, const char *name, fz_image *image, fz_rect)
+{
+    const auto *rewrite = static_cast<const Rewrite *>(opaque);
+    const auto lifted = [ctm](fz_matrix m) { return samePlacement(m, ctm); };
+    if (std::ranges::any_of(rewrite->edit->images, lifted))
+        return nullptr;
+    return std::strcmp(name, kInline) == 0 ? fz_keep_image(ctx, image) : image;
 }
 
 void appendColor(fz_context *ctx, fz_buffer *out, QRgb color)
@@ -97,6 +110,7 @@ QString rewritePage(fz_context *ctx, pdf_page *page, const PageEdit &edit)
     pdf_sanitize_filter_options sanitize{};
     sanitize.opaque = &rewrite;
     sanitize.text_filter = edit.removed.empty() ? nullptr : dropGlyph;
+    sanitize.image_filter = edit.images.empty() ? nullptr : dropImage;
     pdf_filter_factory filters[] = {{pdf_new_sanitize_filter, &sanitize}, {nullptr, nullptr}};
     pdf_filter_options options{};
     options.recurse = 1;
@@ -113,4 +127,10 @@ QString rewritePage(fz_context *ctx, pdf_page *page, const PageEdit &edit)
         for (size_t i = 0; i < edit.spans.size(); ++i)
             pdf_dict_puts(ctx, fonts, rewrite.names[i].constData(), edit.spans[i].font);
     });
+}
+
+bool samePlacement(fz_matrix a, fz_matrix b)
+{
+    const float gaps[] = {a.a - b.a, a.b - b.b, a.c - b.c, a.d - b.d, a.e - b.e, a.f - b.f};
+    return std::ranges::all_of(gaps, [](float gap) { return std::fabs(gap) < kOriginTolerance; });
 }

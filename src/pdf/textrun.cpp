@@ -1,6 +1,6 @@
 #include "textrun.h"
 
-#include "backdrop.h"
+#include "drawing.h"
 #include "document.h"
 #include "font/fontname.h"
 
@@ -100,7 +100,7 @@ PageText pageText(Document &doc, int index)
     {
         page = fz_load_page(ctx, &doc.pdf()->super, index);
         text = extractText(ctx, page);
-        traceBackdrops(ctx, page, found.backdrops);
+        traceDrawing(ctx, page, found);
     }
     fz_catch(ctx)
     {

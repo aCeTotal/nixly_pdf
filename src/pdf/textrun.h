@@ -1,6 +1,7 @@
 #pragma once
 
 #include "context.h"
+#include "picture.h"
 
 #include <QPointF>
 #include <QRectF>
@@ -34,11 +35,12 @@ struct LiveRun
     fz_font *font;
 };
 
-// Runs and filled backdrops.
+// Runs, fills and pictures.
 struct PageText
 {
     std::vector<TextRun> runs;
     std::vector<QRectF> backdrops;
+    std::vector<Picture> pictures;
 };
 
 fz_stext_page *extractText(fz_context *ctx, fz_page *page);

@@ -17,6 +17,7 @@ struct TextPage
     std::vector<TextRun> runs;
     std::vector<Line> lines;
     std::vector<QRectF> panels;
+    std::vector<Picture> pictures;
 };
 
 TextPage arrange(PageText text);

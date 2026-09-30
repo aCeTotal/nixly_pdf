@@ -101,7 +101,7 @@ void findPanels(TextPage &page, std::vector<QRectF> boxes)
 
 TextPage arrange(PageText text)
 {
-    TextPage page{std::move(text.runs), {}, {}};
+    TextPage page{std::move(text.runs), {}, {}, std::move(text.pictures)};
     page.lines = linesOf(page.runs);
     std::vector<QRectF> boxes = std::move(text.backdrops);
     std::vector<QRectF> texts;

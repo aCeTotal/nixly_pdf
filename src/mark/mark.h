@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QByteArray>
 #include <QColor>
 #include <QImage>
 #include <QPointF>
@@ -23,4 +24,5 @@ struct Mark
     QString text;
     double size = 12;
     QImage image;
+    QByteArray encoded;
 };

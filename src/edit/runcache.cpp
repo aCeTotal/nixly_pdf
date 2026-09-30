@@ -40,3 +40,11 @@ Passage RunCache::hit(int index, QPointF point)
         return {};
     return passageAt(text, size_t(found->line));
 }
+
+std::optional<Picture> RunCache::pictureAt(int index, QPointF point)
+{
+    const std::vector<Picture> &pictures = page(index).pictures;
+    const auto hit = std::ranges::find_if(pictures.rbegin(), pictures.rend(),
+                                          [point](const Picture &picture) { return picture.box.contains(point); });
+    return hit == pictures.rend() ? std::nullopt : std::optional<Picture>(*hit);
+}

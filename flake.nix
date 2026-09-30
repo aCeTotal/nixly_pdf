@@ -67,6 +67,8 @@
             (pkgs.tesseract.override { enableLanguages = [ "eng" "nor" ]; })
           ];
 
+          qtWrapperArgs = [ "--prefix PATH : ${pkgs.lib.makeBinPath [ pkgs.libreoffice ]}" ];
+
           mesonFlags = [
             "-Dsignature_fonts=${signatureFonts}"
             "-Dfallback_fonts=${fallbackFonts}/share/fonts"
@@ -82,6 +84,7 @@
 
         devShells.default = pkgs.mkShell {
           inputsFrom = [ nixly-pdf ];
+          packages = [ pkgs.libreoffice ];
           SIGNATURE_FONTS = signatureFonts;
           FALLBACK_FONTS = "${fallbackFonts}/share/fonts";
         };

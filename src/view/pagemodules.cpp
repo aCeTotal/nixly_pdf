@@ -68,11 +68,8 @@ void PageView::paintModules(QPainter &painter, int index)
     painter.save();
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setTransform(pageToView(index));
-    for (int id : modules->onPage(doc->slot(index).id)) {
-        if (editor->isVisible() && editor->module() == id)
-            continue;
+    for (int id : modules->onPage(doc->slot(index).id))
         paintModule(painter, *modules->find(id), modules->layout(id));
-    }
     painter.restore();
 }
 
@@ -200,7 +197,10 @@ void PageView::editText(int id)
         return;
     selected = id;
     bar->hide();
-    editor->open(*module, modules->fonts(), zoom.value());
+    const int index = doc->indexOf(module->page);
+    const QTransform toView = moduleTransform(*module) * pageToView(index);
+    const std::optional<QPointF> at = cursor ? std::optional(toView.inverted().map(*cursor)) : std::nullopt;
+    editor->open(*module, modules->fonts(), at);
     syncEditors();
     update();
 }
@@ -226,7 +226,7 @@ void PageView::syncEditors()
         return;
     const QRectF box = frameOf(*module, modules->layout(selected), pageToView(index)).boundingRect();
     if (editor->isVisible())
-        editor->place(pageToView(index).map(module->anchor));
+        editor->place(moduleTransform(*module) * pageToView(index));
     bar->move(barPoint(box, bar));
 }
 
@@ -243,14 +243,19 @@ void PageView::buildModuleTools()
 {
     editor = new ModuleEditor(this);
     bar = new ModuleBar(this);
+    connect(editor, &ModuleEditor::edited, this, [this](const Module &module) {
+        modules->update(module);
+        syncEditors();
+    });
     connect(editor, &ModuleEditor::committed, this, [this](const Module &module) {
         modules->update(module);
         setFocus();
         showBar();
     });
-    connect(editor, &ModuleEditor::cancelled, this, [this] {
+    connect(editor, &ModuleEditor::cancelled, this, [this](const Module &original) {
+        modules->update(original);
         setFocus();
-        update();
+        showBar();
     });
     connect(bar, &ModuleBar::changed, this, [this](const Module &module) {
         modules->update(module);

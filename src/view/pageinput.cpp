@@ -68,7 +68,10 @@ void PageView::mousePressEvent(QMouseEvent *event)
     if (mode != Mode::Edit || !hovered)
         return;
     const Hover lift = *std::exchange(hovered, std::nullopt);
-    emit liftRequested(lift.index, lift.passage);
+    if (lift.picture)
+        emit pictureRequested(lift.index, *lift.picture);
+    else
+        emit liftRequested(lift.index, lift.passage);
 }
 
 void PageView::mouseMoveEvent(QMouseEvent *event)
@@ -274,13 +277,17 @@ void PageView::hoverText(QPointF pos)
 {
     const std::optional<Spot> spot = spotAt(pos);
     Passage found = spot ? runs.hit(spot->index, spot->point) : Passage();
-    const bool same = hovered && !found.runs.empty() && hovered->index == spot->index &&
-                      hovered->passage.runs.front().glyphs == found.runs.front().glyphs &&
-                      hovered->passage.runs.size() == found.runs.size();
-    if (same || (found.runs.empty() && !hovered))
+    const bool text = !found.runs.empty();
+    const std::optional<Picture> picture = spot && !text ? runs.pictureAt(spot->index, spot->point) : std::nullopt;
+    if (picture)
+        found.outlines = {picture->box};
+    const bool none = !text && !picture;
+    const bool same = hovered && !none && hovered->index == spot->index && hovered->passage.outlines == found.outlines;
+    if (same || (none && !hovered))
         return;
-    hovered = found.runs.empty() ? std::nullopt : std::optional<Hover>(Hover{spot->index, std::move(found)});
-    setCursor(hovered ? Qt::IBeamCursor : Qt::ArrowCursor);
+    hovered = none ? std::nullopt : std::optional<Hover>(Hover{spot->index, std::move(found), picture});
+    const Qt::CursorShape shape = hovered && hovered->picture ? Qt::PointingHandCursor : Qt::IBeamCursor;
+    setCursor(hovered ? shape : Qt::ArrowCursor);
     update();
 }
 

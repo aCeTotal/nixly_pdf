@@ -68,7 +68,7 @@ QString strip(fz_context *ctx, pdf_page *page, fz_stext_page *text, Job &job)
         for (const QPointF &p : run.glyphs)
             removed.push_back(fz_transform_point(fz_make_point(float(p.x()), float(p.y())), toUser));
     }
-    return rewritePage(ctx, page, {removed, {}, {}});
+    return rewritePage(ctx, page, {removed, {}, {}, {}});
 }
 
 QString lift(fz_context *ctx, pdf_document *doc, Job &job)

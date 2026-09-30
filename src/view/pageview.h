@@ -35,12 +35,14 @@ public:
     int currentPage() const { return current; }
     void armPlacement(const Module &prototype);
     void armMark(const Mark &prototype);
+    void pick(int id);
     void select(int id);
     void editText(int id);
 
 signals:
     void currentPageChanged(int index);
     void liftRequested(int index, const Passage &passage);
+    void pictureRequested(int index, const Picture &picture);
     void placementCancelled();
     void toolFinished();
 
@@ -74,6 +76,7 @@ private:
     {
         int index;
         Passage passage;
+        std::optional<Picture> picture;
     };
     struct Ghost
     {
@@ -137,7 +140,6 @@ private:
     void startSketch(QPointF pos);
     void drawSketch(QPointF pos);
     void finishSketch(QPointF pos);
-    void pick(int id);
     void editCallout(int id);
     bool markKey(QKeyEvent *event);
     void showMarkBar();

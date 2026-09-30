@@ -29,6 +29,7 @@ struct Slot
     int style;
     Glyph glyph;
     char32_t code;
+    qsizetype unit = 0;
     float kerned = 0;
 };
 
@@ -126,6 +127,7 @@ std::vector<Slot> Shaper::shape(const QString &text, qsizetype begin, qsizetype 
     qsizetype unit = begin;
     for (char32_t c : QStringView(text).sliced(begin, end - begin).toUcs4()) {
         shaped.push_back(slotFor(c, map[size_t(unit)], shaped));
+        shaped.back().unit = unit;
         unit += QChar::requiresSurrogates(c) ? 2 : 1;
     }
     for (size_t first = 0, last = 0; first < shaped.size(); first = last) {
@@ -195,9 +197,14 @@ GlyphRun runFrom(const Shaper &shaper, const Slot &slot, QPointF origin)
 
 void place(const Shaper &shaper, std::span<const Slot> line, double y, Layout &layout)
 {
+    const int row = int(layout.baselines.size());
+    layout.baselines.push_back(y);
     double x = 0;
     for (size_t i = 0; i < line.size(); ++i) {
         const Slot &slot = line[i];
+        layout.stops[size_t(slot.unit)] = {x, row};
+        if (QChar::requiresSurrogates(slot.code))
+            layout.stops[size_t(slot.unit) + 1] = {x, row};
         if (!slot.face)
             continue;
         if (i == 0 || !sameStretch(line[i - 1], slot))
@@ -212,6 +219,10 @@ void place(const Shaper &shaper, std::span<const Slot> line, double y, Layout &l
         x += shaper.width(slot);
     }
     layout.bounds.setRight(std::max(layout.bounds.right(), x));
+    if (line.empty())
+        return;
+    const Slot &last = line.back();
+    layout.stops[size_t(last.unit + (QChar::requiresSurrogates(last.code) ? 2 : 1))] = {x, row};
 }
 
 } // namespace
@@ -225,7 +236,7 @@ Layout typeset(const Module &module, FontLibrary &fonts)
     const QRawFont *metrics = body.empty() ? nullptr : &body.front()->raw;
     const double ascent = metrics ? metrics->ascent() * size / kEm : size * kAscent;
     const double descent = metrics ? metrics->descent() * size / kEm : size * kDescent;
-    Layout layout;
+    Layout layout{{}, {}, std::vector<Stop>(size_t(module.text.size()) + 1, {0, 0}), {}, ascent, descent};
     int line = 0;
     for (qsizetype begin = 0, end = 0; begin <= module.text.size(); begin = end + 1) {
         end = module.text.indexOf('\n', begin);
@@ -233,6 +244,8 @@ Layout typeset(const Module &module, FontLibrary &fonts)
         const std::vector<Slot> shaped = shaper.shape(module.text, begin, end);
         for (std::span<const Slot> text : wrap(shaper, shaped, module.width))
             place(shaper, text, line++ * leading, layout);
+        if (shaped.empty())
+            layout.stops[size_t(begin)] = {0, line - 1};
     }
     layout.bounds.setTop(-ascent);
     layout.bounds.setBottom((line - 1) * leading + descent);

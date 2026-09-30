@@ -96,14 +96,23 @@ void describeCallout(fz_context *ctx, pdf_annot *annot, const Mark &mark)
     pdf_set_annot_callout_style(ctx, annot, PDF_ANNOT_LE_CLOSED_ARROW);
 }
 
-void describeImage(fz_context *ctx, pdf_annot *annot, const Mark &mark)
+// Original bytes, else a fresh encoding.
+QByteArray encodingOf(const Mark &mark)
 {
-    QByteArray png;
-    QBuffer sink(&png);
+    if (!mark.encoded.isEmpty())
+        return mark.encoded;
+    QByteArray bytes;
+    QBuffer sink(&bytes);
     sink.open(QIODevice::WriteOnly);
     mark.image.save(&sink, mark.image.hasAlphaChannel() ? "PNG" : "JPG", kJpegQuality);
-    const auto *bytes = reinterpret_cast<const unsigned char *>(png.constData());
-    fz_buffer *data = fz_new_buffer_from_copied_data(ctx, bytes, size_t(png.size()));
+    return bytes;
+}
+
+void describeImage(fz_context *ctx, pdf_annot *annot, const Mark &mark)
+{
+    const QByteArray file = encodingOf(mark);
+    const auto *bytes = reinterpret_cast<const unsigned char *>(file.constData());
+    fz_buffer *data = fz_new_buffer_from_copied_data(ctx, bytes, size_t(file.size()));
     fz_image *image = nullptr;
     fz_var(image);
     fz_try(ctx)

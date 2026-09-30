@@ -1,9 +1,10 @@
 # Nixly PDF
 
-Fast PDF reader, editor and signer built on Qt 6 and MuPDF.
+Fast PDF reader, editor and signer built on Qt 6 and MuPDF. Opens images, Office files, e-books and more as PDF.
 
 - **Read** – smooth continuous scrolling, tiled multi-threaded rendering, a page strip you scroll through with the wheel.
-- **Edit** – click a paragraph, table cell or boxed block to lift it into one movable text box that keeps the document's own fonts and colours; restyle, rewrap, move or delete it. Add text and dates; draw arrows, callouts, rectangles, circles and clouds and place images, which stay editable PDF annotations in any reader. Recognise text on scanned pages; add, insert, drag to reorder and delete pages.
+- **Open anything** – drop or open PDFs, images, SVG, EPUB, XPS, text, and Word, Excel, PowerPoint or LibreOffice files; several at once become one document.
+- **Edit** – click a paragraph, table cell, boxed block or picture to lift it off the page and move it; lifted text keeps the document's own fonts and colours and can be restyled, rewrapped or deleted. Add text and dates; draw arrows, callouts, rectangles, circles and clouds and place images, which stay editable PDF annotations in any reader. Recognise text on scanned pages; add, insert, drag to reorder and delete pages.
 - **Sign** – write your name, pick one of eighteen handwriting fonts and an ink, then place and move it freely.
 - **Protect** – save with a passphrase; AES-256 encryption that Acrobat and other readers open.
 
@@ -28,6 +29,7 @@ meson test -C build
 ```
 src/app     window, top bar, theme, toasts
 src/pdf     MuPDF document, rendering, page content rewriting
+src/convert other file types to PDF
 src/font    embedded and installed fonts
 src/ocr     text recognition for scanned pages
 src/view    page view, page strip, smooth scrolling

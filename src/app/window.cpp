@@ -1,5 +1,7 @@
 #include "window.h"
 
+#include "convert/converter.h"
+#include "convert/formats.h"
 #include "edit/editbar.h"
 #include "lockdialog.h"
 #include "mark/annotate.h"
@@ -7,6 +9,7 @@
 #include "module/flatten.h"
 #include "module/moduleset.h"
 #include "pdf/document.h"
+#include "pdf/pagetree.h"
 #include "pdf/renderer.h"
 #include "toast.h"
 #include "topbar.h"
@@ -32,7 +35,7 @@ const QString kPdfFilter = QStringLiteral("PDF documents (*.pdf)");
 
 Window::Window(const QString &path)
     : bar(new TopBar(buildFileMenu())), editBar(new EditBar), strip(new ThumbStrip), view(new PageView),
-      toast(nullptr)
+      toast(nullptr), converter(new Converter(this))
 {
     resize(1280, 900);
     setAcceptDrops(true);
@@ -54,6 +57,8 @@ Window::Window(const QString &path)
     connect(view, &PageView::currentPageChanged, strip, &ThumbStrip::setCurrent);
     connect(view, &PageView::liftRequested, this,
             [this](int index, const Passage &passage) { lift(index, passage); });
+    connect(view, &PageView::pictureRequested, this,
+            [this](int index, const Picture &picture) { liftPicture(index, picture); });
     connect(view, &PageView::placementCancelled, this, [this] { setMode(mode); });
     connect(strip, &ThumbStrip::pageChosen, view, &PageView::goToPage);
     connect(strip, &ThumbStrip::pageMoved, this, [this](int from, int to) { movePage(from, to); });
@@ -67,9 +72,14 @@ Window::Window(const QString &path)
     connect(view, &PageView::toolFinished, editBar, &EditBar::release);
     connect(editBar, &EditBar::recognize, this, [this] { recognizePage(); });
 
+    connect(converter, &Converter::finished, this,
+            [this](const QStringList &sources, const QStringList &pdfs, const QString &error) {
+                openConverted(sources, pdfs, error);
+            });
+
     markDirty(false);
     if (!path.isEmpty())
-        open(path);
+        openFiles({path});
 }
 
 Window::~Window()
@@ -96,9 +106,45 @@ void Window::chooseFile()
 {
     if (!confirmDiscard())
         return;
-    const QString path = QFileDialog::getOpenFileName(this, tr("Open PDF"), QString(), kPdfFilter);
-    if (!path.isEmpty())
-        open(path);
+    const QStringList files = QFileDialog::getOpenFileNames(this, tr("Open"), QString(), openFilter());
+    if (!files.isEmpty())
+        openFiles(files);
+}
+
+// PDFs open directly, others convert.
+void Window::openFiles(const QStringList &files)
+{
+    if (files.size() == 1 && sourceOf(files.front()) == Source::Pdf) {
+        open(files.front());
+        return;
+    }
+    if (converter->busy()) {
+        toast->pop(tr("Still converting the previous file"), Tone::Info);
+        return;
+    }
+    toast->pop(tr("Converting %1 …").arg(QFileInfo(files.front()).fileName()), Tone::Info);
+    converter->start(files);
+}
+
+// Opens first PDF, appends rest.
+void Window::openConverted(const QStringList &sources, const QStringList &pdfs, const QString &error)
+{
+    if (!error.isEmpty()) {
+        toast->pop(error, Tone::Error);
+        return;
+    }
+    open(pdfs.front());
+    if (!doc || doc->path() != pdfs.front())
+        return;
+    const QFileInfo first(sources.front());
+    suggested = first.dir().filePath(first.completeBaseName() + QStringLiteral(".pdf"));
+    QString failure;
+    for (qsizetype i = 1; i < pdfs.size() && failure.isEmpty(); ++i)
+        insertPdf(*doc, doc->count(), pdfs[i], &failure);
+    if (!failure.isEmpty())
+        toast->pop(tr("Could not add every file: %1").arg(failure), Tone::Error);
+    if (pdfs.size() > 1)
+        structureChanged(0);
 }
 
 void Window::open(const QString &path)
@@ -130,6 +176,7 @@ void Window::open(const QString &path)
     fonts = std::move(nextFonts);
     renderer = std::move(nextRenderer);
     doc = std::move(next);
+    suggested.clear();
     setMode(Mode::Read);
     markDirty(false);
 }
@@ -151,7 +198,9 @@ bool Window::unlock(Document &candidate)
 
 bool Window::save()
 {
-    return doc && writeTo(doc->path());
+    if (!doc)
+        return false;
+    return suggested.isEmpty() ? writeTo(doc->path()) : saveAs();
 }
 
 bool Window::writeTo(const QString &path)
@@ -167,6 +216,7 @@ bool Window::writeTo(const QString &path)
         toast->pop(tr("Save failed: %1").arg(error), Tone::Error);
         return false;
     }
+    suggested.clear();
     markDirty(false);
     toast->pop(tr("Saved %1").arg(QFileInfo(path).fileName()), Tone::Info);
     return true;
@@ -192,7 +242,8 @@ bool Window::saveEncrypted()
 
 QString Window::chooseTarget(const QString &title)
 {
-    QString path = QFileDialog::getSaveFileName(this, title, doc->path(), kPdfFilter);
+    const QString start = suggested.isEmpty() ? doc->path() : suggested;
+    QString path = QFileDialog::getSaveFileName(this, title, start, kPdfFilter);
     if (!path.isEmpty() && !path.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive))
         path += QStringLiteral(".pdf");
     return path;
@@ -232,12 +283,18 @@ void Window::closeEvent(QCloseEvent *event)
 void Window::dragEnterEvent(QDragEnterEvent *event)
 {
     const QList<QUrl> urls = event->mimeData()->urls();
-    if (urls.size() == 1 && urls.front().toLocalFile().endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive))
+    const auto readable = [](const QUrl &url) {
+        return url.isLocalFile() && sourceOf(url.toLocalFile()) != Source::Unknown;
+    };
+    if (!urls.isEmpty() && std::ranges::all_of(urls, readable))
         event->acceptProposedAction();
 }
 
 void Window::dropEvent(QDropEvent *event)
 {
+    QStringList files;
+    for (const QUrl &url : event->mimeData()->urls())
+        files << url.toLocalFile();
     if (confirmDiscard())
-        open(event->mimeData()->urls().front().toLocalFile());
+        openFiles(files);
 }

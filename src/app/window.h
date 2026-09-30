@@ -8,6 +8,7 @@
 #include <future>
 #include <memory>
 
+class Converter;
 class Document;
 class EditBar;
 class FontLibrary;
@@ -20,6 +21,7 @@ class ThumbStrip;
 class Toast;
 class TopBar;
 struct Passage;
+struct Picture;
 enum class MarkKind;
 
 class Window : public QMainWindow
@@ -36,6 +38,8 @@ protected:
 private:
     QMenu *buildFileMenu();
     void chooseFile();
+    void openFiles(const QStringList &files);
+    void openConverted(const QStringList &sources, const QStringList &pdfs, const QString &error);
     void open(const QString &path);
     bool unlock(Document &candidate);
     bool save();
@@ -50,6 +54,7 @@ private:
     void addText();
     void addDate();
     void drawMark(MarkKind kind);
+    void liftPicture(int index, const Picture &picture);
     QImage chooseImage();
     void recognizePage();
     void applyRecognized(int page, const OcrResult &result);
@@ -71,6 +76,8 @@ private:
     ThumbStrip *strip;
     PageView *view;
     Toast *toast;
+    Converter *converter;
+    QString suggested;
     QAction *saveAction;
     QAction *saveAsAction;
     QAction *encryptAction;

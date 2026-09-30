@@ -1,6 +1,7 @@
 #include "pickmarks.h"
 
 #include "pdf/document.h"
+#include "pdf/picture.h"
 
 #include <algorithm>
 #include <optional>
@@ -131,30 +132,6 @@ Mark calloutOf(fz_context *ctx, pdf_annot *annot)
     return mark;
 }
 
-// RGB pixels, alpha kept.
-fz_pixmap *rgbOf(fz_context *ctx, fz_image *image)
-{
-    fz_pixmap *source = fz_get_pixmap_from_image(ctx, image, nullptr, nullptr, nullptr, nullptr);
-    fz_pixmap *rgb = nullptr;
-    fz_var(rgb);
-    fz_try(ctx)
-        rgb = fz_convert_pixmap(ctx, source, fz_device_rgb(ctx), nullptr, nullptr, fz_default_color_params, 1);
-    fz_always(ctx)
-        fz_drop_pixmap(ctx, source);
-    fz_catch(ctx)
-        fz_rethrow(ctx);
-    return rgb;
-}
-
-QImage pictureOf(fz_context *ctx, fz_pixmap *pix)
-{
-    const QImage::Format format =
-        fz_pixmap_alpha(ctx, pix) ? QImage::Format_RGBA8888_Premultiplied : QImage::Format_RGB888;
-    const QImage view(fz_pixmap_samples(ctx, pix), fz_pixmap_width(ctx, pix), fz_pixmap_height(ctx, pix),
-                      int(fz_pixmap_stride(ctx, pix)), format);
-    return view.copy();
-}
-
 // Picture held by image stamp.
 std::optional<Mark> imageOf(fz_context *ctx, pdf_annot *annot)
 {
@@ -162,19 +139,12 @@ std::optional<Mark> imageOf(fz_context *ctx, pdf_annot *annot)
     if (!picture)
         return std::nullopt;
     fz_image *image = pdf_load_image(ctx, pdf_annot_page(ctx, annot)->doc, picture);
-    fz_pixmap *pix = nullptr;
-    fz_var(pix);
-    fz_try(ctx)
-        pix = rgbOf(ctx, image);
-    fz_always(ctx)
-        fz_drop_image(ctx, image);
-    fz_catch(ctx)
-        fz_rethrow(ctx);
     Mark mark;
     mark.kind = MarkKind::Image;
     mark.box = innerOf(ctx, annot, 0);
-    mark.image = pictureOf(ctx, pix);
-    fz_drop_pixmap(ctx, pix);
+    mark.image = decodeImage(ctx, image);
+    mark.encoded = jpegOf(ctx, image);
+    fz_drop_image(ctx, image);
     return mark;
 }
 

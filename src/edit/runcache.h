@@ -2,6 +2,7 @@
 
 #include "passage.h"
 
+#include <optional>
 #include <unordered_map>
 
 // Lazily arranged text per page.
@@ -13,6 +14,8 @@ public:
 
     // Paragraph or panel under point.
     Passage hit(int index, QPointF point);
+    // Topmost picture under point.
+    std::optional<Picture> pictureAt(int index, QPointF point);
 
 private:
     const TextPage &page(int index);
