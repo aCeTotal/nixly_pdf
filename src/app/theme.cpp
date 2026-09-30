@@ -2,16 +2,24 @@
 
 #include <QApplication>
 #include <QFont>
+#include <QGraphicsDropShadowEffect>
+#include <QAbstractButton>
+#include <QLabel>
 #include <QPalette>
 
 namespace theme {
 
 namespace {
 
+constexpr double kShadowBlur = 24;
+constexpr double kShadowDrop = 6;
+constexpr int kShadowAlpha = 110;
+
 const char *kStyleSheet = R"(
 QWidget { color: #f0f0f2; }
 QDialog, QMessageBox, QColorDialog, QFileDialog { background: #1a1b26; }
-QToolTip { background: #1a1b26; color: #f0f0f2; border: 1px solid rgba(122,162,247,110); padding: 4px 8px; border-radius: 6px; }
+QToolTip { background: #1a1b26; color: #f0f0f2; border: 1px solid rgba(122,162,247,110);
+           padding: 4px 8px; border-radius: 6px; }
 QLabel#caption { color: #7aa2f7; font-size: 11px; font-weight: 600; letter-spacing: 1.2px; padding-top: 6px; }
 QLabel#title { color: #8b8f9a; font-size: 13px; }
 QLineEdit, QPlainTextEdit, QDateEdit {
@@ -34,23 +42,30 @@ QPushButton#style { min-height: 46px; padding: 2px 14px; text-align: left; }
 QPushButton#style:checked { background: rgba(122,162,247,55); border: 1px solid #7aa2f7; }
 QPushButton#swatch { border-radius: 15px; border: 2px solid rgba(255,255,255,40); padding: 0; }
 QPushButton#swatch:checked { border: 3px solid #7aa2f7; }
-QPushButton#mode { background: transparent; border: none; border-radius: 8px; padding: 6px 18px; color: #8b8f9a; font-weight: 600; }
+QPushButton#mode { background: transparent; border: none; border-radius: 8px; padding: 6px 18px;
+                   color: #8b8f9a; font-weight: 600; }
 QPushButton#mode:hover { color: #f0f0f2; }
 QPushButton#mode:checked { background: rgba(122,162,247,70); color: #f0f0f2; }
 QPushButton#mode:disabled { color: #4a4d5a; }
 QFrame#segment { background: rgba(255,255,255,12); border: 1px solid rgba(255,255,255,24); border-radius: 11px; }
 QFrame#bar { background: #1a1b26; border-bottom: 1px solid rgba(255,255,255,16); }
 QFrame#editbar { background: #16161f; border-bottom: 1px solid rgba(255,255,255,12); }
+QFrame#floatbar { background: #1f2030; border: 1px solid rgba(255,255,255,30); border-radius: 12px; }
 QLabel#hint { color: #8b8f9a; }
 QToolButton#file { background: transparent; border: none; border-radius: 8px; padding: 6px 12px; font-weight: 600; }
 QToolButton#file:hover, QToolButton#file:open { background: rgba(255,255,255,20); }
 QToolButton#file::menu-indicator { image: none; }
+QToolButton#tool { background: transparent; border: none; border-radius: 8px; padding: 6px; }
+QToolButton#tool:hover { background: rgba(255,255,255,20); }
+QToolButton#tool:checked { background: rgba(122,162,247,70); }
+QFrame#divider { background: rgba(255,255,255,24); margin: 0 6px; }
 QMenu { background: #1f2030; border: 1px solid rgba(255,255,255,26); border-radius: 10px; padding: 6px; }
 QMenu::item { padding: 7px 28px 7px 14px; border-radius: 6px; }
 QMenu::item:selected { background: rgba(122,162,247,80); }
 QMenu::item:disabled { color: #5c6070; }
 QMenu::separator { height: 1px; background: rgba(255,255,255,20); margin: 5px 8px; }
-QCheckBox::indicator { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,60); background: rgba(255,255,255,10); }
+QCheckBox::indicator { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,60);
+                       background: rgba(255,255,255,10); }
 QCheckBox::indicator:checked { background: #7aa2f7; border-color: #7aa2f7; }
 QSlider::groove:horizontal { height: 4px; background: rgba(255,255,255,30); border-radius: 2px; }
 QSlider::sub-page:horizontal { background: #7aa2f7; border-radius: 2px; }
@@ -78,6 +93,29 @@ void apply(QApplication &app)
     font.setPixelSize(13);
     app.setFont(font);
     app.setStyleSheet(QString::fromLatin1(kStyleSheet));
+}
+
+QLabel *caption(const QString &text)
+{
+    auto *label = new QLabel(text.toUpper());
+    label->setObjectName("caption");
+    return label;
+}
+
+void paintInk(QAbstractButton *button, const QColor &colour)
+{
+    button->setStyleSheet(QStringLiteral("QToolButton { background: %1; border-radius: 9px; min-width: 18px;"
+                                         " min-height: 18px; border: 2px solid rgba(255,255,255,70); }")
+                              .arg(colour.name()));
+}
+
+void lift(QWidget *panel)
+{
+    auto *shadow = new QGraphicsDropShadowEffect(panel);
+    shadow->setBlurRadius(kShadowBlur);
+    shadow->setOffset(0, kShadowDrop);
+    shadow->setColor(QColor(0, 0, 0, kShadowAlpha));
+    panel->setGraphicsEffect(shadow);
 }
 
 } // namespace theme

@@ -6,7 +6,10 @@
 FontFile matchFont(const FontQuery &query)
 {
     static std::once_flag bundled;
-    std::call_once(bundled, [] { FcConfigAppFontAddDir(nullptr, reinterpret_cast<const FcChar8 *>(FALLBACK_FONT_DIR)); });
+    std::call_once(bundled, [] {
+        FcConfigAppFontAddDir(nullptr, reinterpret_cast<const FcChar8 *>(FALLBACK_FONT_DIR));
+        FcConfigAppFontAddDir(nullptr, reinterpret_cast<const FcChar8 *>(SIGNATURE_FONT_DIR));
+    });
     const QByteArray family = query.family.toUtf8();
     FcPattern *pattern = FcPatternCreate();
     const QByteArray generic = query.generic.toUtf8();

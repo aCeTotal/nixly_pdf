@@ -2,7 +2,9 @@
 
 #include "context.h"
 
+#include <QByteArray>
 #include <QSizeF>
+#include <functional>
 #include <QString>
 #include <memory>
 #include <mutex>
@@ -22,8 +24,11 @@ public:
 
     bool locked() const;
     bool unlock(const QString &password);
-    bool save(const QString &path, QString *error);
-    void markFontEmbedded();
+    // Encrypts every later save.
+    void protect(const QString &passphrase);
+    // Optional flattening of a copy.
+    using Finisher = std::function<QString(fz_context *, pdf_document *)>;
+    bool save(const QString &path, const Finisher &finish, QString *error);
 
     // Locked edit, then page refresh.
     template <typename Change>
@@ -55,5 +60,6 @@ private:
     std::vector<PageSlot> pages;
     std::mutex guard;
     bool encrypted;
-    bool fontsEmbedded = false;
+    QByteArray password;
+    QByteArray passphrase;
 };

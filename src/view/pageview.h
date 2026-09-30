@@ -2,24 +2,22 @@
 
 #include "app/mode.h"
 #include "edit/runcache.h"
+#include "layers.h"
+#include "mark/markset.h"
+#include "module/moduleset.h"
 #include "overlay.h"
 #include "pagelayout.h"
 #include "smoothvalue.h"
 #include "ticker.h"
 
 #include <QWidget>
-#include <functional>
 #include <optional>
 
+class CalloutEditor;
+class MarkBar;
+class ModuleBar;
+class ModuleEditor;
 class Renderer;
-class RunEditor;
-
-// Stamp painter centred at origin.
-struct StampPreview
-{
-    QSizeF size;
-    std::function<void(QPainter &)> paint;
-};
 
 // Continuous, smoothly scrolling page view.
 class PageView : public QWidget
@@ -29,19 +27,22 @@ class PageView : public QWidget
 public:
     explicit PageView(QWidget *parent = nullptr);
 
-    void setDocument(Document *doc, Renderer *renderer);
+    void setDocument(Document *doc, Renderer *renderer, Layers layers);
     void setMode(Mode mode);
     void relayout();
     void forgetText(int id);
     void goToPage(int index);
     int currentPage() const { return current; }
-    void armStamp(StampPreview preview);
+    void armPlacement(const Module &prototype);
+    void armMark(const Mark &prototype);
+    void select(int id);
+    void editText(int id);
 
 signals:
     void currentPageChanged(int index);
-    void runEdited(int index, const TextRun &run, const QString &text);
-    void stampPlaced(int index, QPointF center);
-    void stampCancelled();
+    void liftRequested(int index, const Passage &passage);
+    void placementCancelled();
+    void toolFinished();
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -50,6 +51,7 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void leaveEvent(QEvent *event) override;
 
@@ -59,10 +61,38 @@ private:
         int index;
         QPointF point;
     };
-    struct Editing
+    enum class Grip { Move, Width, Size };
+    struct Drag
+    {
+        int id;
+        Grip grip;
+        QPointF grab;
+        Module start;
+        QRectF bounds;
+    };
+    struct Hover
     {
         int index;
-        TextRun run;
+        Passage passage;
+    };
+    struct Ghost
+    {
+        Module module;
+        Layout layout;
+    };
+    struct MarkDrag
+    {
+        int id;
+        int handle;
+        QPointF grab;
+        Mark start;
+    };
+    struct Sketch
+    {
+        int index;
+        QPointF from;
+        QPointF press;
+        Mark mark;
     };
 
     bool frame(double seconds);
@@ -74,18 +104,48 @@ private:
     ScrollState scrollState() const;
     std::optional<Spot> spotAt(QPointF pos) const;
     QRectF toView(int index, const QRectF &box) const;
+    QTransform pageToView(int index) const;
+    bool zoomKey(int key);
+    double scrollStep(int key) const;
+    bool moduleKey(QKeyEvent *event);
+    static std::optional<QPointF> nudgeOf(const QKeyEvent *event);
+    void cancelPlacement();
     void paintPages(QPainter &painter);
     void paintOverlays(QPainter &painter);
     void paintEmpty(QPainter &painter);
-    bool zoomKey(int key);
-    double scrollStep(int key) const;
-    void cancelStamp();
+
+    bool interactive() const;
+    void paintModules(QPainter &painter, int index);
+    void paintSelection(QPainter &painter);
+    void paintGhost(QPainter &painter);
+    std::optional<Grip> gripAt(QPointF pos) const;
+    bool pressModule(QPointF pos);
+    void dragModule(QPointF pos);
+    bool placeModule(QPointF pos);
     void hoverText(QPointF pos);
-    void beginEdit();
-    void placeEditor();
+    void showBar();
+    void syncEditors();
+    QPoint barPoint(const QRectF &area, const QWidget *panel) const;
+
+    void buildModuleTools();
+    void buildMarkTools();
+    void paintMarks(QPainter &painter, int index);
+    void paintMarkSelection(QPainter &painter);
+    std::optional<int> markHandleAt(QPointF pos) const;
+    bool pressMark(QPointF pos);
+    void dragMark(QPointF pos);
+    void startSketch(QPointF pos);
+    void drawSketch(QPointF pos);
+    void finishSketch(QPointF pos);
+    void pick(int id);
+    void editCallout(int id);
+    bool markKey(QKeyEvent *event);
+    void showMarkBar();
+    void syncMarks();
 
     Document *doc = nullptr;
     Renderer *renderer = nullptr;
+    ModuleSet *modules = nullptr;
     Mode mode = Mode::Read;
     PageLayout layout;
     SmoothValue scrollX;
@@ -101,10 +161,19 @@ private:
     std::optional<double> gripOffset;
 
     RunCache runs;
-    std::optional<Editing> hovered;
-    std::optional<Editing> editing;
-    RunEditor *editor;
-
-    std::optional<StampPreview> stamp;
+    std::optional<Hover> hovered;
+    int selected = 0;
+    std::optional<Drag> drag;
+    std::optional<Ghost> ghost;
     std::optional<QPointF> cursor;
+    ModuleEditor *editor;
+    ModuleBar *bar;
+
+    MarkSet *marks = nullptr;
+    int picked = 0;
+    std::optional<Mark> armed;
+    std::optional<Sketch> sketch;
+    std::optional<MarkDrag> markDrag;
+    MarkBar *markBar;
+    CalloutEditor *callout;
 };

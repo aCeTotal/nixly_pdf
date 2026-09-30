@@ -31,7 +31,11 @@ TopBar::TopBar(QMenu *fileMenu, QWidget *parent)
     auto *switches = new QHBoxLayout(segment);
     switches->setContentsMargins(3, 3, 3, 3);
     switches->setSpacing(2);
-    const std::pair<Mode, QString> entries[] = {{Mode::Read, tr("Read")}, {Mode::Edit, tr("Edit")}, {Mode::Sign, tr("Sign")}};
+    const std::pair<Mode, QString> entries[] = {
+        {Mode::Read, tr("Read")},
+        {Mode::Edit, tr("Edit")},
+        {Mode::Sign, tr("Sign")},
+    };
     for (const auto &[mode, label] : entries) {
         auto *button = new QPushButton(label);
         button->setObjectName("mode");

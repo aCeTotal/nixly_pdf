@@ -1,21 +1,26 @@
 #pragma once
 
 #include "mode.h"
+#include "ocr/ocr.h"
 #include "sign/signature.h"
-#include "sign/signaturelayout.h"
 
 #include <QMainWindow>
+#include <future>
 #include <memory>
-#include <optional>
 
 class Document;
 class EditBar;
+class FontLibrary;
+class QImage;
+class MarkSet;
+class ModuleSet;
 class PageView;
 class Renderer;
 class ThumbStrip;
 class Toast;
 class TopBar;
-struct TextRun;
+struct Passage;
+enum class MarkKind;
 
 class Window : public QMainWindow
 {
@@ -35,11 +40,19 @@ private:
     bool unlock(Document &candidate);
     bool save();
     bool saveAs();
+    bool saveEncrypted();
+    QString chooseTarget(const QString &title);
+    bool writeTo(const QString &path);
     bool confirmDiscard();
     void setMode(Mode next);
     void startSigning();
-    void placeSignature(int index, QPointF centre);
-    void editRun(int index, const TextRun &run, const QString &text);
+    void lift(int index, const Passage &passage);
+    void addText();
+    void addDate();
+    void drawMark(MarkKind kind);
+    QImage chooseImage();
+    void recognizePage();
+    void applyRecognized(int page, const OcrResult &result);
     void structureChanged(int focus);
     void addBlank();
     void insertFile();
@@ -49,6 +62,10 @@ private:
 
     std::unique_ptr<Document> doc;
     std::unique_ptr<Renderer> renderer;
+    std::unique_ptr<FontLibrary> fonts;
+    std::unique_ptr<ModuleSet> modules;
+    std::unique_ptr<MarkSet> marks;
+    std::future<void> recognition;
     TopBar *bar;
     EditBar *editBar;
     ThumbStrip *strip;
@@ -56,8 +73,9 @@ private:
     Toast *toast;
     QAction *saveAction;
     QAction *saveAsAction;
+    QAction *encryptAction;
     Mode mode = Mode::Read;
     bool dirty = false;
+    unsigned generation = 0;
     Signature lastSignature;
-    std::optional<SignatureLayout> pending;
 };

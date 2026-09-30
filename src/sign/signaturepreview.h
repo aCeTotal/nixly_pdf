@@ -1,5 +1,6 @@
 #pragma once
 
+#include "font/fontlibrary.h"
 #include "signature.h"
 
 #include <QWidget>
@@ -16,4 +17,5 @@ protected:
 
 private:
     Signature shown;
+    FontLibrary fonts;
 };

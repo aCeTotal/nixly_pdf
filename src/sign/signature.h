@@ -1,16 +1,14 @@
 #pragma once
 
-#include <QColor>
-#include <QDate>
-#include <QString>
+#include "module/module.h"
 
 struct Signature
 {
     QString name;
     int font = 0;
     QColor color = QColor(24, 38, 92);
-    QString note;
-    bool dated = true;
-    QDate date = QDate::currentDate();
     double size = 30;
 };
+
+// Placeable module drawing the signature.
+Module signatureModule(const Signature &signature);

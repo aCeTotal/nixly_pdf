@@ -1,8 +1,12 @@
 #pragma once
 
 #include <QColor>
+#include <QString>
 
 class QApplication;
+class QAbstractButton;
+class QLabel;
+class QWidget;
 
 namespace theme {
 
@@ -20,5 +24,14 @@ inline QColor faded(QColor color, int alpha)
 }
 
 void apply(QApplication &app);
+
+// Small uppercase section label.
+QLabel *caption(const QString &text);
+
+// Round colour swatch button.
+void paintInk(QAbstractButton *button, const QColor &colour);
+
+// Shadow under floating panel.
+void lift(QWidget *panel);
 
 } // namespace theme

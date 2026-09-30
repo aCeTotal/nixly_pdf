@@ -9,8 +9,7 @@ constexpr float kOriginTolerance = 0.35f;
 
 struct Rewrite
 {
-    const std::vector<fz_point> *removed;
-    const std::vector<TextSpan> *spans;
+    const PageEdit *edit;
     std::vector<QByteArray> names;
 };
 
@@ -18,11 +17,16 @@ int dropGlyph(fz_context *, void *opaque, int *, int, fz_matrix trm, fz_matrix c
 {
     const auto *rewrite = static_cast<const Rewrite *>(opaque);
     const fz_matrix m = fz_concat(trm, ctm);
-    for (const fz_point &p : *rewrite->removed) {
+    for (const fz_point &p : rewrite->edit->removed) {
         if (std::fabs(p.x - m.e) < kOriginTolerance && std::fabs(p.y - m.f) < kOriginTolerance)
             return 1;
     }
     return 0;
+}
+
+void appendColor(fz_context *ctx, fz_buffer *out, QRgb color)
+{
+    fz_append_printf(ctx, out, "%g %g %g rg ", qRed(color) / 255.0f, qGreen(color) / 255.0f, qBlue(color) / 255.0f);
 }
 
 void appendItems(fz_context *ctx, fz_buffer *out, const TextSpan &span)
@@ -49,16 +53,24 @@ void appendItems(fz_context *ctx, fz_buffer *out, const TextSpan &span)
     fz_append_string(ctx, out, "] TJ\n");
 }
 
-void appendSpans(fz_context *ctx, fz_buffer *out, void *opaque)
+void appendInk(fz_context *ctx, fz_buffer *out, void *opaque)
 {
     const auto *rewrite = static_cast<const Rewrite *>(opaque);
-    for (size_t i = 0; i < rewrite->spans->size(); ++i) {
-        const TextSpan &span = (*rewrite->spans)[i];
-        const fz_matrix &m = span.matrix;
-        fz_append_printf(ctx, out, "\nq %g %g %g rg BT /%s 1 Tf %g %g %g %g %g %g Tm ",
-                         qRed(span.color) / 255.0f, qGreen(span.color) / 255.0f, qBlue(span.color) / 255.0f,
-                         rewrite->names[i].constData(), m.a, m.b, m.c, m.d, m.e, m.f);
-        appendItems(ctx, out, span);
+    for (const Cover &cover : rewrite->edit->covers) {
+        const fz_quad &q = cover.quad;
+        fz_append_string(ctx, out, "\nq ");
+        appendColor(ctx, out, cover.color);
+        fz_append_printf(ctx, out, "%g %g m %g %g l %g %g l %g %g l f Q\n", q.ul.x, q.ul.y, q.ur.x, q.ur.y, q.lr.x,
+                         q.lr.y, q.ll.x, q.ll.y);
+    }
+    const std::vector<TextSpan> &spans = rewrite->edit->spans;
+    for (size_t i = 0; i < spans.size(); ++i) {
+        const fz_matrix &m = spans[i].matrix;
+        fz_append_string(ctx, out, "\nq ");
+        appendColor(ctx, out, spans[i].color);
+        fz_append_printf(ctx, out, "BT /%s 1 Tf %g %g %g %g %g %g Tm ", rewrite->names[i].constData(), m.a, m.b, m.c,
+                         m.d, m.e, m.f);
+        appendItems(ctx, out, spans[i]);
         fz_append_string(ctx, out, "ET Q\n");
     }
 }
@@ -74,32 +86,31 @@ QByteArray freeName(fz_context *ctx, pdf_obj *fonts, int *serial)
 
 } // namespace
 
-QString rewritePage(fz_context *ctx, pdf_document *doc, pdf_page *page, const std::vector<fz_point> &removed,
-                    const std::vector<TextSpan> &spans)
+QString rewritePage(fz_context *ctx, pdf_page *page, const PageEdit &edit)
 {
-    Rewrite rewrite{&removed, &spans, {}};
+    Rewrite rewrite{&edit, {}};
     pdf_obj *oldFonts = pdf_dict_get(ctx, pdf_page_resources(ctx, page), PDF_NAME(Font));
     int serial = 0;
-    for (size_t i = 0; i < spans.size(); ++i)
+    for (size_t i = 0; i < edit.spans.size(); ++i)
         rewrite.names.push_back(freeName(ctx, oldFonts, &serial));
 
     pdf_sanitize_filter_options sanitize{};
     sanitize.opaque = &rewrite;
-    sanitize.text_filter = removed.empty() ? nullptr : dropGlyph;
+    sanitize.text_filter = edit.removed.empty() ? nullptr : dropGlyph;
     pdf_filter_factory filters[] = {{pdf_new_sanitize_filter, &sanitize}, {nullptr, nullptr}};
     pdf_filter_options options{};
     options.recurse = 1;
     options.instance_forms = 1;
     options.opaque = &rewrite;
-    options.complete = appendSpans;
+    options.complete = appendInk;
     options.filters = filters;
     return attempt(ctx, [&] {
-        pdf_filter_page_contents(ctx, doc, page, &options);
+        pdf_filter_page_contents(ctx, page->doc, page, &options);
         pdf_obj *resources = pdf_page_resources(ctx, page);
         pdf_obj *fonts = pdf_dict_get(ctx, resources, PDF_NAME(Font));
         if (!fonts)
-            fonts = pdf_dict_put_dict(ctx, resources, PDF_NAME(Font), int(spans.size()));
-        for (size_t i = 0; i < spans.size(); ++i)
-            pdf_dict_puts(ctx, fonts, rewrite.names[i].constData(), spans[i].font);
+            fonts = pdf_dict_put_dict(ctx, resources, PDF_NAME(Font), int(edit.spans.size()));
+        for (size_t i = 0; i < edit.spans.size(); ++i)
+            pdf_dict_puts(ctx, fonts, rewrite.names[i].constData(), edit.spans[i].font);
     });
 }

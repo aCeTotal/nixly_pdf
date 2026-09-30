@@ -1,11 +1,11 @@
 #include "window.h"
 
 #include "edit/editbar.h"
+#include "mark/markset.h"
+#include "module/moduleset.h"
 #include "pdf/document.h"
 #include "pdf/pagetree.h"
 #include "pdf/renderer.h"
-#include "pdf/stamp.h"
-#include "pdf/textedit.h"
 #include "toast.h"
 #include "sign/signdialog.h"
 #include "topbar.h"
@@ -21,7 +21,6 @@ void Window::setMode(Mode next)
         return;
     }
     mode = next;
-    pending.reset();
     bar->setMode(next);
     view->setMode(next);
     strip->setMode(next);
@@ -39,42 +38,13 @@ void Window::startSigning()
         return;
     }
     lastSignature = dialog.signature();
-    setMode(Mode::Read);
-    pending.emplace(lastSignature);
+    mode = Mode::Sign;
     bar->setMode(Mode::Sign);
-    view->armStamp({pending->size(), [layout = *pending](QPainter &painter) { layout.paint(painter); }});
-    toast->pop(tr("Click where the signature goes  ·  Esc cancels"), Tone::Info);
-}
-
-void Window::placeSignature(int index, QPointF centre)
-{
-    const QString error = placeStamp(*doc, index, pending->stampLines(centre));
-    pending.reset();
-    bar->setMode(Mode::Read);
-    if (!error.isEmpty()) {
-        toast->pop(tr("Could not sign: %1").arg(error), Tone::Error);
-        return;
-    }
-    const int id = doc->slot(index).id;
-    renderer->forget(id);
-    view->forgetText(id);
-    markDirty(true);
-    toast->pop(tr("Signed page %1").arg(index + 1), Tone::Info);
-}
-
-void Window::editRun(int index, const TextRun &run, const QString &text)
-{
-    const EditOutcome outcome = replaceRun(*doc, index, run, text);
-    if (!outcome.error.isEmpty()) {
-        toast->pop(tr("Could not change text: %1").arg(outcome.error), Tone::Error);
-        return;
-    }
-    const int id = doc->slot(index).id;
-    renderer->forget(id);
-    view->forgetText(id);
-    markDirty(true);
-    if (!outcome.substitute.isEmpty())
-        toast->pop(tr("The embedded font lacks these letters, so %1 was used").arg(outcome.substitute), Tone::Info);
+    view->setMode(Mode::Sign);
+    strip->setMode(Mode::Sign);
+    editBar->conceal();
+    view->armPlacement(signatureModule(lastSignature));
+    toast->pop(tr("Click where the signature goes  \u00B7  Esc cancels"), Tone::Info);
 }
 
 void Window::structureChanged(int focus)
@@ -117,11 +87,14 @@ void Window::deletePage(int index)
 {
     if (!doc || doc->count() <= 1 || index < 0)
         return;
+    const int id = doc->slot(index).id;
     QString error;
     if (!::deletePage(*doc, index, &error)) {
         toast->pop(tr("Could not delete page: %1").arg(error), Tone::Error);
         return;
     }
+    modules->dropPage(id);
+    marks->dropPage(id);
     structureChanged(std::min(index, doc->count() - 1));
     toast->pop(tr("Deleted page %1").arg(index + 1), Tone::Info);
 }

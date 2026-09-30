@@ -1,6 +1,6 @@
 #include "scriptfonts.h"
 
-#include "pdf/systemfont.h"
+#include "font/systemfont.h"
 
 #include <QFile>
 #include <QFontDatabase>
@@ -10,6 +10,14 @@ const std::vector<ScriptFont> &scriptFonts()
     static const std::vector<ScriptFont> fonts = [] {
         const QString dir = QStringLiteral(SIGNATURE_FONT_DIR "/");
         const char *files[] = {
+            "MrsSaintDelafield-Regular.ttf",
+            "MrDeHaviland-Regular.ttf",
+            "Cedarville-Cursive.ttf",
+            "LaBelleAurore.ttf",
+            "DawningofaNewDay.ttf",
+            "Zeyada.ttf",
+            "NothingYouCouldDo.ttf",
+            "Kristi-Regular.ttf",
             "GreatVibes-Regular.ttf",
             "AlexBrush-Regular.ttf",
             "Allura-Regular.ttf",
@@ -34,6 +42,7 @@ const std::vector<ScriptFont> &scriptFonts()
 
 const QString &labelFont()
 {
-    static const QString path = QFile::decodeName(matchFont({QStringLiteral("sans-serif"), QStringLiteral("sans-serif"), false, false, {}}).path);
+    const QString sans = QStringLiteral("sans-serif");
+    static const QString path = QFile::decodeName(matchFont({sans, sans, false, false, {}}).path);
     return path;
 }

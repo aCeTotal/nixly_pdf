@@ -1,6 +1,11 @@
 #include "window.h"
 
 #include "edit/editbar.h"
+#include "lockdialog.h"
+#include "mark/annotate.h"
+#include "mark/pickmarks.h"
+#include "module/flatten.h"
+#include "module/moduleset.h"
 #include "pdf/document.h"
 #include "pdf/renderer.h"
 #include "toast.h"
@@ -47,24 +52,31 @@ Window::Window(const QString &path)
 
     connect(bar, &TopBar::modeChosen, this, [this](Mode next) { setMode(next); });
     connect(view, &PageView::currentPageChanged, strip, &ThumbStrip::setCurrent);
-    connect(view, &PageView::runEdited, this, [this](int index, const TextRun &run, const QString &text) {
-        editRun(index, run, text);
-    });
-    connect(view, &PageView::stampPlaced, this, [this](int index, QPointF centre) { placeSignature(index, centre); });
-    connect(view, &PageView::stampCancelled, this, [this] { setMode(Mode::Read); });
+    connect(view, &PageView::liftRequested, this,
+            [this](int index, const Passage &passage) { lift(index, passage); });
+    connect(view, &PageView::placementCancelled, this, [this] { setMode(mode); });
     connect(strip, &ThumbStrip::pageChosen, view, &PageView::goToPage);
     connect(strip, &ThumbStrip::pageMoved, this, [this](int from, int to) { movePage(from, to); });
     connect(strip, &ThumbStrip::deleteRequested, this, [this](int index) { deletePage(index); });
     connect(editBar, &EditBar::addBlank, this, [this] { addBlank(); });
     connect(editBar, &EditBar::insertFile, this, [this] { insertFile(); });
     connect(editBar, &EditBar::deletePage, this, [this] { deletePage(view->currentPage()); });
+    connect(editBar, &EditBar::addText, this, [this] { addText(); });
+    connect(editBar, &EditBar::addDate, this, [this] { addDate(); });
+    connect(editBar, &EditBar::drawMark, this, [this](MarkKind kind) { drawMark(kind); });
+    connect(view, &PageView::toolFinished, editBar, &EditBar::release);
+    connect(editBar, &EditBar::recognize, this, [this] { recognizePage(); });
 
     markDirty(false);
     if (!path.isEmpty())
         open(path);
 }
 
-Window::~Window() = default;
+Window::~Window()
+{
+    if (recognition.valid())
+        recognition.wait();
+}
 
 QMenu *Window::buildFileMenu()
 {
@@ -73,6 +85,7 @@ QMenu *Window::buildFileMenu()
     menu->addSeparator();
     saveAction = menu->addAction(tr("Save"), QKeySequence::Save, this, [this] { save(); });
     saveAsAction = menu->addAction(tr("Save as…"), QKeySequence::SaveAs, this, [this] { saveAs(); });
+    encryptAction = menu->addAction(tr("Save encrypted…"), this, [this] { saveEncrypted(); });
     menu->addSeparator();
     QAction *quitAction = menu->addAction(tr("Quit"), QKeySequence::Quit, this, &QWidget::close);
     addActions({openAction, saveAction, saveAsAction, quitAction});
@@ -98,10 +111,23 @@ void Window::open(const QString &path)
     }
     if (next->locked() && !unlock(*next))
         return;
+    if (recognition.valid())
+        recognition.wait();
+    ++generation;
     auto nextRenderer = std::make_unique<Renderer>(*next);
-    pending.reset();
-    view->setDocument(next.get(), nextRenderer.get());
-    strip->setDocument(next.get(), nextRenderer.get());
+    auto nextFonts = std::make_unique<FontLibrary>();
+    auto nextModules = std::make_unique<ModuleSet>(*nextFonts);
+    auto nextMarks = std::make_unique<MarkSet>();
+    for (Mark &mark : pickMarks(*next))
+        nextMarks->add(std::move(mark));
+    connect(nextModules.get(), &ModuleSet::changed, this, [this] { markDirty(true); });
+    connect(nextMarks.get(), &MarkSet::changed, this, [this] { markDirty(true); });
+    const Layers layers{nextModules.get(), nextMarks.get()};
+    view->setDocument(next.get(), nextRenderer.get(), layers);
+    strip->setDocument(next.get(), nextRenderer.get(), layers);
+    modules = std::move(nextModules);
+    marks = std::move(nextMarks);
+    fonts = std::move(nextFonts);
     renderer = std::move(nextRenderer);
     doc = std::move(next);
     setMode(Mode::Read);
@@ -125,35 +151,51 @@ bool Window::unlock(Document &candidate)
 
 bool Window::save()
 {
-    if (!doc)
-        return false;
+    return doc && writeTo(doc->path());
+}
+
+bool Window::writeTo(const QString &path)
+{
+    Document::Finisher finish;
+    if (!modules->empty() || !marks->empty())
+        finish = [this](fz_context *ctx, pdf_document *copy) {
+            const QString failure = flatten(ctx, copy, {*doc, *modules});
+            return failure.isEmpty() ? annotate(ctx, copy, {*doc, *marks}) : failure;
+        };
     QString error;
-    if (!doc->save(doc->path(), &error)) {
+    if (!doc->save(path, finish, &error)) {
         toast->pop(tr("Save failed: %1").arg(error), Tone::Error);
         return false;
     }
     markDirty(false);
-    toast->pop(tr("Saved"), Tone::Info);
+    toast->pop(tr("Saved %1").arg(QFileInfo(path).fileName()), Tone::Info);
     return true;
 }
 
 bool Window::saveAs()
 {
-    if (!doc)
+    const QString path = doc ? chooseTarget(tr("Save PDF as")) : QString();
+    return !path.isEmpty() && writeTo(path);
+}
+
+bool Window::saveEncrypted()
+{
+    LockDialog lock(this);
+    if (!doc || lock.exec() != QDialog::Accepted)
         return false;
-    QString path = QFileDialog::getSaveFileName(this, tr("Save PDF as"), doc->path(), kPdfFilter);
+    const QString path = chooseTarget(tr("Save encrypted PDF as"));
     if (path.isEmpty())
         return false;
-    if (!path.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive))
+    doc->protect(lock.passphrase());
+    return writeTo(path);
+}
+
+QString Window::chooseTarget(const QString &title)
+{
+    QString path = QFileDialog::getSaveFileName(this, title, doc->path(), kPdfFilter);
+    if (!path.isEmpty() && !path.endsWith(QStringLiteral(".pdf"), Qt::CaseInsensitive))
         path += QStringLiteral(".pdf");
-    QString error;
-    if (!doc->save(path, &error)) {
-        toast->pop(tr("Save failed: %1").arg(error), Tone::Error);
-        return false;
-    }
-    markDirty(false);
-    toast->pop(tr("Saved as %1").arg(QFileInfo(path).fileName()), Tone::Info);
-    return true;
+    return path;
 }
 
 bool Window::confirmDiscard()
@@ -176,6 +218,7 @@ void Window::markDirty(bool changed)
     bar->setModesEnabled(doc != nullptr);
     saveAction->setEnabled(doc != nullptr);
     saveAsAction->setEnabled(doc != nullptr);
+    encryptAction->setEnabled(doc != nullptr);
 }
 
 void Window::closeEvent(QCloseEvent *event)

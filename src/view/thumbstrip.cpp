@@ -2,6 +2,8 @@
 
 #include "pdf/document.h"
 #include "pdf/renderer.h"
+#include "mark/markset.h"
+#include "module/moduleset.h"
 
 #include <QKeyEvent>
 #include <algorithm>
@@ -14,8 +16,8 @@ constexpr double kMargin = 16;
 constexpr double kLiftThreshold = 6;
 constexpr double kEdge = 48;
 constexpr double kEdgeSpeed = 900;
-constexpr double kWheelStep = 110;
 constexpr double kNotch = 120.0;
+constexpr double kPagePixels = 60;
 
 } // namespace
 
@@ -27,15 +29,20 @@ ThumbStrip::ThumbStrip(QWidget *parent)
     setAttribute(Qt::WA_OpaquePaintEvent);
 }
 
-void ThumbStrip::setDocument(Document *document, Renderer *source)
+void ThumbStrip::setDocument(Document *document, Renderer *source, Layers shown)
 {
     doc = document;
     renderer = source;
+    layers = shown;
     current = -1;
     drag.reset();
     scroll.jump(0);
     if (renderer)
         connect(renderer, &Renderer::updated, this, qOverload<>(&QWidget::update));
+    if (layers.modules)
+        connect(layers.modules, &ModuleSet::changed, this, qOverload<>(&QWidget::update));
+    if (layers.marks)
+        connect(layers.marks, &MarkSet::changed, this, qOverload<>(&QWidget::update));
     relayout();
 }
 
@@ -51,6 +58,7 @@ void ThumbStrip::relayout()
     const int count = doc ? doc->count() : 0;
     tops.resize(size_t(count));
     shifts.assign(size_t(count), SmoothValue());
+    landed = -1;
     double y = kMargin;
     for (int i = 0; i < count; ++i) {
         tops[size_t(i)] = y;
@@ -67,6 +75,7 @@ void ThumbStrip::setCurrent(int index)
     if (index == current)
         return;
     current = index;
+    aim = index == aim ? -1 : aim;
     follow(index);
     update();
 }
@@ -109,15 +118,6 @@ void ThumbStrip::follow(int index)
     ticker.start();
 }
 
-void ThumbStrip::scrub(double y)
-{
-    if (tops.empty())
-        return;
-    const int index = slotAt(y + scroll.value());
-    if (index != current)
-        emit pageChosen(index);
-}
-
 bool ThumbStrip::frame(double seconds)
 {
     double edge = 0;
@@ -129,28 +129,30 @@ bool ThumbStrip::frame(double seconds)
         scroll.shift(edge * kEdgeSpeed * seconds);
     scroll.advance(seconds);
     scroll.clamp(0, std::max(0.0, extent - height()));
-    bool moving = scroll.moving() || edge != 0;
+    raise.advance(seconds);
+    landed = raise.moving() ? landed : -1;
+    bool moving = scroll.moving() || raise.moving() || edge != 0;
     for (SmoothValue &shift : shifts) {
         shift.advance(seconds);
         moving = moving || shift.moving();
     }
-    if (edge != 0 && mode != Mode::Edit)
-        scrub(pointer);
     if (edge != 0 && drag->lifted)
         arrange(dropSlot());
     update();
     return moving;
 }
 
+// Steps through pages.
 void ThumbStrip::wheelEvent(QWheelEvent *event)
 {
     const QPoint pixels = event->pixelDelta();
-    if (pixels.isNull())
-        scroll.setTarget(scroll.target() - event->angleDelta().y() / kNotch * kWheelStep);
-    else
-        scroll.shift(-pixels.y());
-    scroll.clamp(0, std::max(0.0, extent - height()));
-    ticker.start();
+    wheel += pixels.isNull() ? event->angleDelta().y() / kNotch : pixels.y() / kPagePixels;
+    const int steps = int(wheel);
+    wheel -= steps;
+    if (steps == 0 || tops.empty())
+        return;
+    aim = std::clamp((aim < 0 ? current : aim) - steps, 0, int(tops.size()) - 1);
+    emit pageChosen(aim);
 }
 
 void ThumbStrip::mousePressEvent(QMouseEvent *event)
@@ -158,6 +160,7 @@ void ThumbStrip::mousePressEvent(QMouseEvent *event)
     if (event->button() != Qt::LeftButton || tops.empty())
         return;
     pointer = event->position().y();
+    aim = -1;
     const int index = slotAt(pointer + scroll.value());
     drag = Drag{index, pointer + scroll.value() - slotTop(index), false};
     emit pageChosen(index);
@@ -169,14 +172,11 @@ void ThumbStrip::mouseMoveEvent(QMouseEvent *event)
         return;
     pointer = event->position().y();
     ticker.start();
-    if (mode != Mode::Edit) {
-        scrub(pointer);
-        return;
-    }
     const double moved = std::abs(pointer + scroll.value() - slotTop(drag->from) - drag->grab);
     if (!drag->lifted && moved < kLiftThreshold)
         return;
     drag->lifted = true;
+    raise.setTarget(1);
     arrange(dropSlot());
 }
 
@@ -198,13 +198,34 @@ void ThumbStrip::mouseReleaseEvent(QMouseEvent *)
     if (!drag)
         return;
     const int from = drag->from;
-    const int target = drag->lifted ? dropSlot() : from;
+    const int id = doc->slot(from).id;
+    const bool lifted = drag->lifted;
+    const int target = lifted ? dropSlot() : from;
+    const double top = pointer - drag->grab + scroll.value();
     drag.reset();
-    for (SmoothValue &shift : shifts)
-        shift.jump(0);
     if (target != from)
         emit pageMoved(from, target);
+    if (lifted)
+        land(doc->indexOf(id), top);
     update();
+}
+
+// Glides a dropped page home.
+void ThumbStrip::land(int index, double top)
+{
+    for (SmoothValue &shift : shifts)
+        shift.setTarget(0);
+    shifts[size_t(index)].jump(top - slotTop(index));
+    shifts[size_t(index)].setTarget(0);
+    landed = index;
+    raise.setTarget(0);
+    ticker.start();
+}
+
+void ThumbStrip::leaveEvent(QEvent *)
+{
+    wheel = 0;
+    aim = -1;
 }
 
 void ThumbStrip::keyPressEvent(QKeyEvent *event)

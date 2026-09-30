@@ -21,6 +21,14 @@
             };
           })
           [
+            { path = "ofl/mrssaintdelafield/MrsSaintDelafield-Regular.ttf"; hash = "sha256-Z6erwpjOnTaLLAD8v/UuxUvpSIibilkDKugMozIuWzQ="; }
+            { path = "ofl/mrdehaviland/MrDeHaviland-Regular.ttf"; hash = "sha256-EM2ONLF6QnItxJ0tYrf+d0WVq+NMyJ7h15Zj32jqYIk="; }
+            { path = "ofl/cedarvillecursive/Cedarville-Cursive.ttf"; hash = "sha256-X4bXHQimhgXVkSuby2OaBgzpwN69fgtxX14mjUpLwxc="; }
+            { path = "ofl/labelleaurore/LaBelleAurore.ttf"; hash = "sha256-7WdGKZngXwzayS9oY3RmHk1oxW/c19BXJcbfe0HqvSo="; }
+            { path = "ofl/dawningofanewday/DawningofaNewDay.ttf"; hash = "sha256-Kyr6Yj27GSbjsCZgMoe00V7gV3gQbiansz75TUvincs="; }
+            { path = "ofl/zeyada/Zeyada.ttf"; hash = "sha256-CfI9DXi24WbduEgHk7tVCrTCqvZgLtpHo5T+6T0qlmc="; }
+            { path = "ofl/nothingyoucoulddo/NothingYouCouldDo.ttf"; hash = "sha256-Ha+M95B2v1nFqRF7Xv1uzqNeV6Be8Sf+T5WwcrilJF0="; }
+            { path = "ofl/kristi/Kristi-Regular.ttf"; hash = "sha256-ZyW3oo2b2HYeKDSmqzgLq+BzZ4xvQgF/5XYRa51v0qA="; }
             { path = "ofl/greatvibes/GreatVibes-Regular.ttf"; hash = "sha256-jVCYAhhvG1FXJTHs8xPoCY+aW/36ypPwybNEZ/mYLRU="; }
             { path = "ofl/alexbrush/AlexBrush-Regular.ttf"; hash = "sha256-33AgONjid5cjDHeVnBOe7qOMrAyvU+GepbUT07DTNi0="; }
             { path = "ofl/allura/Allura-Regular.ttf"; hash = "sha256-nBQrLlFYMsDfxP+LjqGPQDFJQ7+Te3LisjxGYbrBTMY="; }
@@ -56,6 +64,7 @@
             pkgs.qt6.qtsvg
             pkgs.mupdf
             pkgs.fontconfig
+            (pkgs.tesseract.override { enableLanguages = [ "eng" "nor" ]; })
           ];
 
           mesonFlags = [

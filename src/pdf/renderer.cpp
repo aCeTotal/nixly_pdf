@@ -129,7 +129,7 @@ void Renderer::forget(int page)
     tiles.removeIf([page](const TileKey &key) { return key.page == page; });
     thumbs.remove(page);
     std::lock_guard hold(doc.mutex());
-    const auto stale = std::find_if(lists.begin(), lists.end(), [page](const auto &entry) { return entry.first == page; });
+    const auto stale = std::ranges::find_if(lists, [page](const auto &entry) { return entry.first == page; });
     if (stale == lists.end())
         return;
     fz_drop_display_list(doc.ctx(), stale->second.list);
@@ -176,7 +176,7 @@ Renderer::List Renderer::acquire(int page)
 {
     fz_context *ctx = threadContext();
     std::lock_guard hold(doc.mutex());
-    const auto hit = std::find_if(lists.begin(), lists.end(), [page](const auto &entry) { return entry.first == page; });
+    const auto hit = std::ranges::find_if(lists, [page](const auto &entry) { return entry.first == page; });
     if (hit != lists.end()) {
         std::rotate(lists.begin(), hit, hit + 1);
         return {fz_keep_display_list(ctx, lists.front().second.list), lists.front().second.x0,
@@ -237,7 +237,9 @@ void Renderer::render(const Job &job)
         fz_report_error(ctx);
         image = QImage();
     }
-    QMetaObject::invokeMethod(this, [this, job, image = std::move(image)]() mutable { deliver(job, std::move(image)); });
+    QMetaObject::invokeMethod(this, [this, job, image = std::move(image)]() mutable {
+        deliver(job, std::move(image));
+    });
 }
 
 void Renderer::deliver(const Job &job, QImage image)

@@ -1,7 +1,7 @@
 #include "signaturepreview.h"
 
 #include "app/theme.h"
-#include "signaturelayout.h"
+#include "module/modulepaint.h"
 
 #include <QPainter>
 #include <algorithm>
@@ -36,13 +36,15 @@ void SignaturePreview::paintEvent(QPaintEvent *)
     const double line = card.bottom() - kInset;
     painter.drawLine(QPointF(card.left() + kInset * 2, line), QPointF(card.right() - kInset * 2, line));
 
-    const SignatureLayout layout(shown);
-    const QSizeF size = layout.size();
-    if (size.isEmpty())
+    const Module module = signatureModule(shown);
+    const Layout layout = typeset(module, fonts);
+    const QSizeF size = layout.bounds.size();
+    if (module.text.isEmpty())
         return;
     const QRectF room = card.adjusted(kInset, kInset / 2, -kInset, -kInset / 2);
     const double scale = std::min({kMaxScale, room.width() / size.width(), room.height() / size.height()});
     painter.translate(room.center());
     painter.scale(scale, scale);
-    layout.paint(painter);
+    painter.translate(-layout.bounds.center());
+    paintModule(painter, module, layout);
 }

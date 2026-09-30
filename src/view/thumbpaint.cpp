@@ -3,6 +3,10 @@
 #include "app/theme.h"
 #include "pdf/document.h"
 #include "pdf/renderer.h"
+#include "mark/markpaint.h"
+#include "mark/markset.h"
+#include "module/modulepaint.h"
+#include "module/moduleset.h"
 
 #include <QPainter>
 
@@ -10,6 +14,8 @@ namespace {
 
 constexpr double kRadius = 4;
 constexpr double kLiftScale = 1.06;
+constexpr double kRestShadow = 40;
+constexpr double kLiftShadow = 90;
 
 void paintShadow(QPainter &painter, const QRectF &rect, int strength)
 {
@@ -35,33 +41,43 @@ void ThumbStrip::paintEvent(QPaintEvent *)
     painter.setRenderHint(QPainter::SmoothPixmapTransform);
 
     const double offset = scroll.value();
+    const int floating = drag && drag->lifted ? drag->from : landed;
     for (int i = slotAt(offset); i < int(tops.size()); ++i) {
         const double top = tops[size_t(i)] + shifts[size_t(i)].value() - offset;
         if (top > height())
             break;
-        if (!(drag && drag->lifted && drag->from == i))
-            paintThumb(painter, i, top, false);
+        if (i != floating)
+            paintThumb(painter, i, top, 0);
     }
     if (drag && drag->lifted)
-        paintThumb(painter, drag->from, pointer - drag->grab, true);
+        paintThumb(painter, drag->from, pointer - drag->grab, raise.value());
+    else if (landed >= 0)
+        paintThumb(painter, landed, tops[size_t(landed)] + shifts[size_t(landed)].value() - offset, raise.value());
 }
 
-void ThumbStrip::paintThumb(QPainter &painter, int index, double top, bool lifted)
+void ThumbStrip::paintThumb(QPainter &painter, int index, double top, double raised)
 {
     const QSizeF size = doc->slot(index).size;
     QRectF page((width() - kThumb) / 2, top, kThumb, kThumb * size.height() / size.width());
-    if (lifted) {
-        const QPointF centre = page.center();
-        page.setSize(page.size() * kLiftScale);
-        page.moveCenter(centre);
-    }
+    const QPointF centre = page.center();
+    page.setSize(page.size() * (1 + (kLiftScale - 1) * raised));
+    page.moveCenter(centre);
     const bool active = index == current;
-    paintShadow(painter, page, lifted ? 90 : 40);
+    paintShadow(painter, page, int(kRestShadow + (kLiftShadow - kRestShadow) * raised));
     painter.setBrush(Qt::white);
     painter.drawRoundedRect(page, kRadius, kRadius);
-    if (const QImage *thumb = renderer->thumbnail(doc->slot(index).id))
+    const int id = doc->slot(index).id;
+    if (const QImage *thumb = renderer->thumbnail(id))
         painter.drawImage(page, *thumb);
-    if (active || lifted) {
+    painter.save();
+    painter.translate(page.topLeft());
+    painter.scale(page.width() / size.width(), page.width() / size.width());
+    for (int module : layers.modules->onPage(id))
+        paintModule(painter, *layers.modules->find(module), layers.modules->layout(module));
+    for (int mark : layers.marks->onPage(id))
+        paintMark(painter, *layers.marks->find(mark));
+    painter.restore();
+    if (active || raised > 0) {
         painter.setPen(QPen(theme::accent, 2.5));
         painter.setBrush(Qt::NoBrush);
         painter.drawRoundedRect(page.adjusted(-4, -4, 4, 4), kRadius + 3, kRadius + 3);

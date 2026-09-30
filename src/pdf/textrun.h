@@ -23,6 +23,8 @@ struct TextRun
     bool italic;
     bool serif;
     std::vector<QPointF> glyphs;
+    int block = 0;
+    int line = 0;
 };
 
 // Run plus its live font.
@@ -32,6 +34,13 @@ struct LiveRun
     fz_font *font;
 };
 
+// Runs and filled backdrops.
+struct PageText
+{
+    std::vector<TextRun> runs;
+    std::vector<QRectF> backdrops;
+};
+
 fz_stext_page *extractText(fz_context *ctx, fz_page *page);
 std::vector<LiveRun> collectRuns(fz_context *ctx, fz_stext_page *text);
-std::vector<TextRun> pageRuns(Document &doc, int index);
+PageText pageText(Document &doc, int index);

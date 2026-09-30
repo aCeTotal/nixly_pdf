@@ -8,7 +8,6 @@ class QButtonGroup;
 class QGridLayout;
 class QHBoxLayout;
 class QLineEdit;
-class QPlainTextEdit;
 class QPushButton;
 class QSlider;
 class SignaturePreview;
@@ -25,8 +24,6 @@ private:
     QHBoxLayout *buildInks();
     QPushButton *addSwatch(QHBoxLayout *row);
     QSlider *buildSize();
-    QHBoxLayout *buildDate();
-    QPlainTextEdit *buildNote();
     QHBoxLayout *buildButtons();
     void refresh();
 

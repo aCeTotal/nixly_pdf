@@ -1,7 +1,8 @@
 #include "textrun.h"
 
+#include "backdrop.h"
 #include "document.h"
-#include "fontname.h"
+#include "font/fontname.h"
 
 #include <cmath>
 #include <cstring>
@@ -13,8 +14,8 @@ constexpr int kVisible = FZ_STEXT_FILLED | FZ_STEXT_STROKED;
 
 bool sameStyle(fz_context *ctx, const fz_stext_char *a, const fz_stext_char *b)
 {
-    const bool sameFace = a->font == b->font ||
-                          std::strcmp(baseFontName(fz_font_name(ctx, a->font)), baseFontName(fz_font_name(ctx, b->font))) == 0;
+    const char *left = baseFontName(fz_font_name(ctx, a->font));
+    const bool sameFace = a->font == b->font || std::strcmp(left, baseFontName(fz_font_name(ctx, b->font))) == 0;
     return sameFace && a->argb == b->argb && std::fabs(a->size - b->size) < kSizeTolerance;
 }
 
@@ -45,6 +46,7 @@ void addChar(TextRun &run, const fz_stext_char *ch)
 void collectLine(fz_context *ctx, const fz_stext_line *line, std::vector<LiveRun> &runs)
 {
     const fz_stext_char *styled = nullptr;
+    const size_t first = runs.size();
     for (const fz_stext_char *ch = line->first_char; ch; ch = ch->next) {
         if (!(ch->flags & kVisible) && !(ch->flags & FZ_STEXT_SYNTHETIC))
             continue;
@@ -54,6 +56,9 @@ void collectLine(fz_context *ctx, const fz_stext_line *line, std::vector<LiveRun
         }
         addChar(runs.back().run, ch);
     }
+    const int number = runs.size() > first && first > 0 ? runs[first - 1].run.line + 1 : 0;
+    for (size_t i = first; i < runs.size(); ++i)
+        runs[i].run.line = number;
 }
 
 } // namespace
@@ -67,19 +72,24 @@ fz_stext_page *extractText(fz_context *ctx, fz_page *page)
 std::vector<LiveRun> collectRuns(fz_context *ctx, fz_stext_page *text)
 {
     std::vector<LiveRun> runs;
+    int number = 0;
     for (fz_stext_block *block = text->first_block; block; block = block->next) {
         if (block->type != FZ_STEXT_BLOCK_TEXT)
             continue;
+        const size_t first = runs.size();
         for (fz_stext_line *line = block->u.t.first_line; line; line = line->next)
             collectLine(ctx, line, runs);
+        for (size_t i = first; i < runs.size(); ++i)
+            runs[i].run.block = number;
+        ++number;
     }
     std::erase_if(runs, [](const LiveRun &live) { return live.run.glyphs.empty(); });
     return runs;
 }
 
-std::vector<TextRun> pageRuns(Document &doc, int index)
+PageText pageText(Document &doc, int index)
 {
-    std::vector<TextRun> runs;
+    PageText found;
     std::lock_guard hold(doc.mutex());
     fz_context *ctx = doc.ctx();
     fz_page *page = nullptr;
@@ -90,16 +100,18 @@ std::vector<TextRun> pageRuns(Document &doc, int index)
     {
         page = fz_load_page(ctx, &doc.pdf()->super, index);
         text = extractText(ctx, page);
+        traceBackdrops(ctx, page, found.backdrops);
     }
     fz_catch(ctx)
     {
         fz_report_error(ctx);
+        fz_drop_stext_page(ctx, text);
         fz_drop_page(ctx, page);
-        return runs;
+        return {};
     }
     for (LiveRun &live : collectRuns(ctx, text))
-        runs.push_back(std::move(live.run));
+        found.runs.push_back(std::move(live.run));
     fz_drop_stext_page(ctx, text);
     fz_drop_page(ctx, page);
-    return runs;
+    return found;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "app/mode.h"
+#include "layers.h"
 #include "smoothvalue.h"
 #include "ticker.h"
 
@@ -22,7 +23,7 @@ public:
 
     explicit ThumbStrip(QWidget *parent = nullptr);
 
-    void setDocument(Document *doc, Renderer *renderer);
+    void setDocument(Document *doc, Renderer *renderer, Layers layers);
     void setMode(Mode mode);
     void relayout();
     void setCurrent(int index);
@@ -38,6 +39,7 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void leaveEvent(QEvent *event) override;
     void keyPressEvent(QKeyEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
 
@@ -54,12 +56,13 @@ private:
     int dropSlot() const;
     double slotTop(int index) const;
     void follow(int index);
-    void scrub(double y);
     void arrange(int to);
-    void paintThumb(QPainter &painter, int index, double top, bool lifted);
+    void land(int index, double top);
+    void paintThumb(QPainter &painter, int index, double top, double raised);
 
     Document *doc = nullptr;
     Renderer *renderer = nullptr;
+    Layers layers;
     Mode mode = Mode::Read;
     std::vector<double> tops;
     std::vector<SmoothValue> shifts;
@@ -68,5 +71,9 @@ private:
     int current = -1;
     std::optional<Drag> drag;
     double pointer = 0;
+    SmoothValue raise;
+    int landed = -1;
+    double wheel = 0;
+    int aim = -1;
     Ticker ticker;
 };

@@ -1,16 +1,14 @@
 #include "signdialog.h"
 
+#include "app/theme.h"
 #include "scriptfonts.h"
 #include "signaturepreview.h"
 
 #include <QButtonGroup>
-#include <QCheckBox>
 #include <QColorDialog>
-#include <QDateEdit>
 #include <QGridLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QPlainTextEdit>
 #include <QPushButton>
 #include <QSlider>
 #include <QVBoxLayout>
@@ -21,18 +19,12 @@ const QColor kInks[] = {QColor(24, 38, 92), QColor(20, 20, 24), QColor(30, 80, 2
                         QColor(128, 24, 40)};
 const char *kRainbow = "QPushButton { background: qconicalgradient(cx:0.5, cy:0.5, angle:0, stop:0 #f7768e,"
                        " stop:0.33 #e0af68, stop:0.66 #7aa2f7, stop:1 #f7768e); }";
-constexpr int kStyleColumns = 2;
+constexpr int kStyleColumns = 3;
 constexpr int kStylePixels = 26;
+constexpr int kStyleWidth = 236;
 constexpr int kSwatch = 30;
 constexpr int kMinSize = 18;
 constexpr int kMaxSize = 54;
-
-QLabel *caption(const QString &text)
-{
-    auto *label = new QLabel(text.toUpper());
-    label->setObjectName("caption");
-    return label;
-}
 
 void paintSwatch(QPushButton *swatch, const QColor &color)
 {
@@ -51,7 +43,7 @@ SignDialog::SignDialog(const Signature &initial, QWidget *parent)
     layout->setSpacing(10);
     layout->addWidget(preview);
 
-    layout->addWidget(caption(tr("Name")));
+    layout->addWidget(theme::caption(tr("Name")));
     name->setPlaceholderText(tr("Your name"));
     layout->addWidget(name);
     connect(name, &QLineEdit::textChanged, this, [this](const QString &text) {
@@ -59,51 +51,14 @@ SignDialog::SignDialog(const Signature &initial, QWidget *parent)
         refresh();
     });
 
-    layout->addWidget(caption(tr("Handwriting")));
+    layout->addWidget(theme::caption(tr("Handwriting")));
     layout->addLayout(buildStyles());
-    layout->addWidget(caption(tr("Ink and size")));
+    layout->addWidget(theme::caption(tr("Ink and size")));
     layout->addLayout(buildInks());
 
-    layout->addLayout(buildDate());
-    layout->addWidget(caption(tr("Extra text")));
-    layout->addWidget(buildNote());
     layout->addSpacing(6);
     layout->addLayout(buildButtons());
     refresh();
-}
-
-QHBoxLayout *SignDialog::buildDate()
-{
-    auto *dated = new QCheckBox(tr("Add date"));
-    dated->setChecked(chosen.dated);
-    auto *date = new QDateEdit(chosen.date);
-    date->setCalendarPopup(true);
-    date->setEnabled(chosen.dated);
-    auto *row = new QHBoxLayout;
-    row->addWidget(dated);
-    row->addWidget(date, 1);
-    connect(dated, &QCheckBox::toggled, this, [this, date](bool on) {
-        chosen.dated = on;
-        date->setEnabled(on);
-        refresh();
-    });
-    connect(date, &QDateEdit::dateChanged, this, [this](QDate day) {
-        chosen.date = day;
-        refresh();
-    });
-    return row;
-}
-
-QPlainTextEdit *SignDialog::buildNote()
-{
-    auto *note = new QPlainTextEdit(chosen.note);
-    note->setPlaceholderText(tr("Title, company, place \u2026"));
-    note->setFixedHeight(64);
-    connect(note, &QPlainTextEdit::textChanged, this, [this, note] {
-        chosen.note = note->toPlainText();
-        refresh();
-    });
-    return note;
 }
 
 QHBoxLayout *SignDialog::buildButtons()
@@ -129,6 +84,7 @@ QGridLayout *SignDialog::buildStyles()
         auto *style = new QPushButton;
         style->setObjectName("style");
         style->setCheckable(true);
+        style->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Preferred);
         style->setChecked(i == chosen.font);
         QFont face(fonts[size_t(i)].family);
         face.setPixelSize(kStylePixels);
@@ -136,6 +92,10 @@ QGridLayout *SignDialog::buildStyles()
         style->setToolTip(fonts[size_t(i)].family);
         styles->addButton(style, i);
         grid->addWidget(style, i / kStyleColumns, i % kStyleColumns);
+    }
+    for (int column = 0; column < kStyleColumns; ++column) {
+        grid->setColumnMinimumWidth(column, kStyleWidth);
+        grid->setColumnStretch(column, 1);
     }
     connect(styles, &QButtonGroup::idClicked, this, [this](int id) {
         chosen.font = id;

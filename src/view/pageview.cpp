@@ -1,7 +1,10 @@
 #include "pageview.h"
 
 #include "app/theme.h"
-#include "edit/runeditor.h"
+#include "mark/callouteditor.h"
+#include "mark/markbar.h"
+#include "module/modulebar.h"
+#include "module/moduleeditor.h"
 #include "pagepainter.h"
 #include "pdf/document.h"
 #include "pdf/renderer.h"
@@ -18,34 +21,35 @@ constexpr QSizeF kEmptyCard(380, 180);
 } // namespace
 
 PageView::PageView(QWidget *parent)
-    : QWidget(parent), ticker(this, [this](double seconds) { return frame(seconds); }), editor(new RunEditor(this))
+    : QWidget(parent), ticker(this, [this](double seconds) { return frame(seconds); })
 {
     setMouseTracking(true);
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_OpaquePaintEvent);
     zoom.jump(1);
-    connect(editor, &RunEditor::committed, this, [this](const QString &text) {
-        const std::optional<Editing> done = std::exchange(editing, std::nullopt);
-        if (done && text != done->run.text)
-            emit runEdited(done->index, done->run, text);
-        update();
-    });
-    connect(editor, &RunEditor::cancelled, this, [this] {
-        editing.reset();
-        setFocus();
-        update();
-    });
+    buildModuleTools();
+    buildMarkTools();
 }
 
-void PageView::setDocument(Document *document, Renderer *source)
+void PageView::setDocument(Document *document, Renderer *source, Layers layers)
 {
     doc = document;
     renderer = source;
+    modules = layers.modules;
+    marks = layers.marks;
+    picked = 0;
+    armed.reset();
+    sketch.reset();
+    markDrag.reset();
+    markBar->hide();
+    callout->hide();
     runs.setDocument(doc);
     hovered.reset();
-    editing.reset();
+    drag.reset();
+    ghost.reset();
+    selected = 0;
     editor->hide();
-    stamp.reset();
+    bar->hide();
     fitted = true;
     current = -1;
     scrollX.jump(0);
@@ -54,15 +58,27 @@ void PageView::setDocument(Document *document, Renderer *source)
     layout = PageLayout();
     if (renderer)
         connect(renderer, &Renderer::updated, this, qOverload<>(&QWidget::update));
+    if (modules)
+        connect(modules, &ModuleSet::changed, this, qOverload<>(&QWidget::update));
+    if (marks)
+        connect(marks, &MarkSet::changed, this, qOverload<>(&QWidget::update));
     relayout();
 }
 
 void PageView::setMode(Mode next)
 {
     mode = next;
-    stamp.reset();
+    ghost.reset();
+    armed.reset();
+    sketch.reset();
+    markDrag.reset();
     hovered.reset();
     editor->clearFocus();
+    callout->clearFocus();
+    if (!interactive()) {
+        select(0);
+        pick(0);
+    }
     unsetCursor();
     update();
 }
@@ -92,9 +108,11 @@ void PageView::goToPage(int index)
     ticker.start();
 }
 
-void PageView::armStamp(StampPreview preview)
+void PageView::armPlacement(const Module &prototype)
 {
-    stamp = std::move(preview);
+    ghost = Ghost{prototype, typeset(prototype, modules->fonts())};
+    armed.reset();
+    select(0);
     setCursor(Qt::CrossCursor);
     setFocus();
     update();
@@ -149,7 +167,7 @@ void PageView::clampScroll()
 
 void PageView::scrolled()
 {
-    placeEditor();
+    syncEditors();
     if (!layout.count())
         return;
     const int page = layout.pageAt(scrollY.value() + height() / 2.0);
@@ -230,35 +248,29 @@ void PageView::paintPages(QPainter &painter)
         for (int i = layout.pageAt(offset.y() + area.top()); i < layout.count(); ++i) {
             if (layout.rect(i).top() - offset.y() > area.bottom())
                 break;
-            draw(frameOf(i, area));
+            draw(i, frameOf(i, area));
         }
     };
     if (!zoom.moving())
-        visit(ahead, [&](const PageFrame &page) { prefetchPage(*renderer, page); });
-    visit(view, [&](const PageFrame &page) { paintPage(painter, *renderer, page); });
+        visit(ahead, [&](int, const PageFrame &page) { prefetchPage(*renderer, page); });
+    visit(view, [&](int i, const PageFrame &page) {
+        paintPage(painter, *renderer, page);
+        paintModules(painter, i);
+        paintMarks(painter, i);
+    });
 }
 
 void PageView::paintOverlays(QPainter &painter)
 {
     painter.setRenderHint(QPainter::Antialiasing);
-    if (hovered && !editing) {
+    for (size_t i = 0; hovered && i < hovered->passage.outlines.size(); ++i) {
         painter.setPen(QPen(theme::accent, 1.5));
         painter.setBrush(theme::faded(theme::accent, 28));
-        painter.drawRoundedRect(toView(hovered->index, hovered->run.box).adjusted(-3, -2, 3, 2), 4, 4);
+        painter.drawRoundedRect(toView(hovered->index, hovered->passage.outlines[i]).adjusted(-3, -2, 3, 2), 4, 4);
     }
-    const std::optional<Spot> spot = cursor ? spotAt(*cursor) : std::nullopt;
-    if (stamp && spot) {
-        const double z = zoom.value();
-        const QSizeF size = stamp->size * z;
-        painter.save();
-        painter.setPen(QPen(theme::accent, 1.5, Qt::DashLine));
-        painter.setBrush(theme::faded(theme::accent, 18));
-        painter.drawRoundedRect(QRectF(*cursor - QPointF(size.width(), size.height()) / 2, size), 6, 6);
-        painter.translate(*cursor);
-        painter.scale(z, z);
-        stamp->paint(painter);
-        painter.restore();
-    }
+    paintSelection(painter);
+    paintMarkSelection(painter);
+    paintGhost(painter);
     overlay.paint(painter, scrollState(), QStringLiteral("%1 / %2").arg(current + 1).arg(layout.count()));
 }
 

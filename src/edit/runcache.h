@@ -1,18 +1,22 @@
 #pragma once
 
-#include "pdf/textrun.h"
+#include "passage.h"
 
 #include <unordered_map>
 
-// Lazily extracted runs per page.
+// Lazily arranged text per page.
 class RunCache
 {
 public:
     void setDocument(Document *doc);
     void forget(int id);
-    const TextRun *hit(int index, QPointF point);
+
+    // Paragraph or panel under point.
+    Passage hit(int index, QPointF point);
 
 private:
+    const TextPage &page(int index);
+
     Document *doc = nullptr;
-    std::unordered_map<int, std::vector<TextRun>> pages;
+    std::unordered_map<int, TextPage> pages;
 };
