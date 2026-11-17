@@ -15,10 +15,6 @@ constexpr double kMinWidth = 0.5;
 constexpr double kMaxWidth = 20;
 constexpr double kMinSize = 6;
 constexpr double kMaxSize = 96;
-const char *kHollow = "QToolButton { border-radius: 9px; min-width: 18px; min-height: 18px;"
-                      " border: 2px solid rgba(255,255,255,70); background: qlineargradient(x1:0, y1:1, x2:1, y2:0,"
-                      " stop:0 transparent, stop:0.44 transparent, stop:0.46 #f7768e, stop:0.54 #f7768e,"
-                      " stop:0.56 transparent, stop:1 transparent); }";
 
 QDoubleSpinBox *spin(double low, double high, const QString &tip)
 {
@@ -48,7 +44,7 @@ MarkBar::MarkBar(QWidget *parent)
     auto *menu = new QMenu(fill);
     menu->addAction(tr("No fill"), this, [this] {
         current.fill = QColor();
-        fill->setStyleSheet(QString::fromLatin1(kHollow));
+        theme::paintHollow(fill);
         emit changed(current);
     });
     menu->addAction(tr("Choose colour…"), this, [this] { pickFill(); });
@@ -85,7 +81,7 @@ void MarkBar::present(const Mark &mark)
     if (mark.fill.isValid())
         theme::paintInk(fill, mark.fill);
     else
-        fill->setStyleSheet(QString::fromLatin1(kHollow));
+        theme::paintHollow(fill);
     width->setValue(mark.width);
     size->setValue(mark.size);
     adjustSize();

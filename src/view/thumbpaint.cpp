@@ -31,8 +31,8 @@ void paintShadow(QPainter &painter, const QRectF &rect, int strength)
 void ThumbStrip::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
-    painter.fillRect(rect(), theme::surface);
-    painter.setPen(theme::faded(theme::text, 18));
+    painter.fillRect(rect(), theme::surface());
+    painter.setPen(theme::faded(theme::text(), 18));
     painter.drawLine(QPointF(width() - 0.5, 0), QPointF(width() - 0.5, height()));
     if (!doc || tops.empty())
         return;
@@ -78,7 +78,7 @@ void ThumbStrip::paintThumb(QPainter &painter, int index, double top, double rai
         paintMark(painter, *layers.marks->find(mark));
     painter.restore();
     if (active || raised > 0) {
-        painter.setPen(QPen(theme::accent, 2.5));
+        painter.setPen(QPen(theme::accent(), 2.5));
         painter.setBrush(Qt::NoBrush);
         painter.drawRoundedRect(page.adjusted(-4, -4, 4, 4), kRadius + 3, kRadius + 3);
     }
@@ -86,7 +86,7 @@ void ThumbStrip::paintThumb(QPainter &painter, int index, double top, double rai
     font.setPixelSize(12);
     font.setWeight(active ? QFont::DemiBold : QFont::Normal);
     painter.setFont(font);
-    painter.setPen(active ? theme::accent : theme::muted);
+    painter.setPen(active ? theme::accent() : theme::muted());
     painter.drawText(QRectF(0, page.bottom() + 6, width(), 16), Qt::AlignHCenter | Qt::AlignTop,
                      QString::number(index + 1));
 }

@@ -36,10 +36,11 @@ Toast::Toast(QWidget *parent) : QLabel(parent)
 
 void Toast::pop(const QString &message, Tone tone)
 {
-    const QColor edge = tone == Tone::Error ? theme::danger : theme::accent;
-    setStyleSheet(QStringLiteral("QLabel { background: rgba(26,27,38,235); border: 1px solid %1;"
+    const QColor edge = tone == Tone::Error ? theme::danger : theme::accent();
+    setStyleSheet(QStringLiteral("QLabel { background: %1; border: 1px solid %2;"
                                  " border-radius: 14px; padding: 9px 18px; font-weight: 600; }")
-                      .arg(theme::faded(edge, 160).name(QColor::HexArgb)));
+                      .arg(theme::faded(theme::surface(), 235).name(QColor::HexArgb),
+                           theme::faded(edge, 160).name(QColor::HexArgb)));
     setText(message);
     adjustSize();
     const QWidget *host = parentWidget();

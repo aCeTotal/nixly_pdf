@@ -66,11 +66,28 @@ const Acting kActing[] = {
      QT_TRANSLATE_NOOP("EditBar", "Remove the current page")},
 };
 
+// Redraws its icon per theme.
+class ToolButton : public QToolButton
+{
+public:
+    explicit ToolButton(Tool tool) : tool(tool) { setIcon(toolIcon(tool)); }
+
+protected:
+    void changeEvent(QEvent *event) override
+    {
+        if (event->type() == QEvent::StyleChange)
+            setIcon(toolIcon(tool));
+        QToolButton::changeEvent(event);
+    }
+
+private:
+    Tool tool;
+};
+
 QToolButton *toolButton(Tool tool, const char *name, const char *hint)
 {
-    auto *button = new QToolButton;
+    auto *button = new ToolButton(tool);
     button->setObjectName("tool");
-    button->setIcon(toolIcon(tool));
     button->setIconSize(QSize(kIcon, kIcon));
     button->setCursor(Qt::PointingHandCursor);
     const QString title = QCoreApplication::translate("EditBar", name);

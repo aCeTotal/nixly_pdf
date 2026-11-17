@@ -118,10 +118,10 @@ void PageView::paintMarkSelection(QPainter &painter)
         return;
     const QTransform toView = pageToView(index);
     const QRectF area = extentOf(*mark).adjusted(-kFrameMargin, -kFrameMargin, kFrameMargin, kFrameMargin);
-    painter.setPen(QPen(theme::accent, 1.5, Qt::DashLine));
-    painter.setBrush(theme::faded(theme::accent, 12));
+    painter.setPen(QPen(theme::accent(), 1.5, Qt::DashLine));
+    painter.setBrush(theme::faded(theme::accent(), 12));
     painter.drawRect(toView.mapRect(area));
-    painter.setPen(QPen(theme::accent, 2));
+    painter.setPen(QPen(theme::accent(), 2));
     painter.setBrush(Qt::white);
     for (const QPointF &handle : handlesOf(*mark))
         painter.drawEllipse(toView.map(handle), kHandle, kHandle);

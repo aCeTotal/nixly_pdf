@@ -66,15 +66,15 @@ void ModuleEditor::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QTransform local = toView * QTransform::fromTranslate(-x(), -y());
-    painter.setPen(QPen(theme::accent, kFrameWidth, Qt::DashLine));
+    painter.setPen(QPen(theme::accent(), kFrameWidth, Qt::DashLine));
     painter.drawRoundedRect(QRectF(rect()).adjusted(1, 1, -1, -1), kRadius, kRadius);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(theme::faded(theme::accent, kSelectionAlpha));
+    painter.setBrush(theme::faded(theme::accent(), kSelectionAlpha));
     for (const QRectF &box : selectionBoxes(shape, anchor, cursor))
         painter.drawPolygon(local.map(QPolygonF(box)));
     if (!lit || !hasFocus())
         return;
-    painter.setPen(QPen(theme::accent, kCaretWidth));
+    painter.setPen(QPen(theme::accent(), kCaretWidth));
     painter.drawLine(local.map(caretAt(shape, cursor)));
 }
 

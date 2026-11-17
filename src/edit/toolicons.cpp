@@ -147,8 +147,8 @@ QIcon toolIcon(Tool tool)
     QPainterPath path;
     kDrawings[size_t(tool)](path);
     QIcon icon;
-    icon.addPixmap(drawn(path, theme::text), QIcon::Normal, QIcon::Off);
-    icon.addPixmap(drawn(path, theme::accent), QIcon::Normal, QIcon::On);
-    icon.addPixmap(drawn(path, theme::faded(theme::text, kDisabledAlpha)), QIcon::Disabled, QIcon::Off);
+    icon.addPixmap(drawn(path, theme::text()), QIcon::Normal, QIcon::Off);
+    icon.addPixmap(drawn(path, theme::accent()), QIcon::Normal, QIcon::On);
+    icon.addPixmap(drawn(path, theme::faded(theme::text(), kDisabledAlpha)), QIcon::Disabled, QIcon::Off);
     return icon;
 }

@@ -29,7 +29,7 @@ void SignaturePreview::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QRectF card = QRectF(rect()).adjusted(1, 1, -1, -1);
-    painter.setPen(QPen(theme::faded(theme::accent, 90), 1));
+    painter.setPen(QPen(theme::faded(theme::accent(), 90), 1));
     painter.setBrush(Qt::white);
     painter.drawRoundedRect(card, 14, 14);
     painter.setPen(QPen(QColor(0, 0, 0, 40), 1, Qt::DashLine));

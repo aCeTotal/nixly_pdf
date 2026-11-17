@@ -80,10 +80,10 @@ void PageView::paintSelection(QPainter &painter)
     if (index < 0 || editor->isVisible())
         return;
     const QPolygonF frame = frameOf(*module, modules->layout(selected), pageToView(index));
-    painter.setPen(QPen(theme::accent, 1.5, Qt::DashLine));
-    painter.setBrush(theme::faded(theme::accent, 16));
+    painter.setPen(QPen(theme::accent(), 1.5, Qt::DashLine));
+    painter.setBrush(theme::faded(theme::accent(), 16));
     painter.drawPolygon(frame);
-    painter.setPen(QPen(theme::accent, 2));
+    painter.setPen(QPen(theme::accent(), 2));
     painter.setBrush(Qt::white);
     painter.drawEllipse(frame[2], kHandle, kHandle);
     if (module->kind == ModuleKind::Text)
@@ -100,8 +100,8 @@ void PageView::paintGhost(QPainter &painter)
     painter.scale(zoom.value(), zoom.value());
     painter.translate(-ghost->layout.bounds.center());
     painter.setOpacity(0.85);
-    painter.setPen(QPen(theme::accent, 1.0 / zoom.value(), Qt::DashLine));
-    painter.setBrush(theme::faded(theme::accent, 18));
+    painter.setPen(QPen(theme::accent(), 1.0 / zoom.value(), Qt::DashLine));
+    painter.setBrush(theme::faded(theme::accent(), 18));
     painter.drawRect(ghost->layout.bounds);
     Module shown = ghost->module;
     shown.anchor = QPointF();

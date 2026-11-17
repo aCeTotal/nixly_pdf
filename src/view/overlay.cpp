@@ -50,7 +50,7 @@ void ScrollOverlay::paint(QPainter &painter, const ScrollState &state, const QSt
     painter.setOpacity(alpha);
     painter.setRenderHint(QPainter::Antialiasing);
     painter.setPen(Qt::NoPen);
-    painter.setBrush(theme::faded(theme::text, 150));
+    painter.setBrush(theme::faded(theme::text(), 150));
     const QRectF bar = thumb(state);
     painter.drawRoundedRect(bar, kThumbWidth / 2, kThumbWidth / 2);
 
@@ -61,10 +61,10 @@ void ScrollOverlay::paint(QPainter &painter, const ScrollState &state, const QSt
     const double width = QFontMetricsF(font).horizontalAdvance(badge) + 28;
     const QRectF pill(state.viewport.center().x() - width / 2, state.viewport.bottom() - kBadgeHeight - 22, width,
                       kBadgeHeight);
-    painter.setBrush(theme::faded(theme::surface, 220));
-    painter.setPen(theme::faded(theme::accent, 110));
+    painter.setBrush(theme::faded(theme::surface(), 220));
+    painter.setPen(theme::faded(theme::accent(), 110));
     painter.drawRoundedRect(pill, kBadgeHeight / 2, kBadgeHeight / 2);
-    painter.setPen(theme::text);
+    painter.setPen(theme::text());
     painter.drawText(pill, Qt::AlignCenter, badge);
     painter.restore();
 }

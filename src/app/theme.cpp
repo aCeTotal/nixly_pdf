@@ -6,6 +6,7 @@
 #include <QAbstractButton>
 #include <QLabel>
 #include <QPalette>
+#include <utility>
 
 namespace theme {
 
@@ -14,85 +15,232 @@ namespace {
 constexpr double kShadowBlur = 24;
 constexpr double kShadowDrop = 6;
 constexpr int kShadowAlpha = 110;
+constexpr int kBackdropDarken = 130;
+constexpr int kRingAlpha = 70;
+
+// Built-in look without dark palette.
+constexpr QColor kAccent(122, 162, 247);
+constexpr QColor kText(240, 240, 242);
+constexpr QColor kMuted(139, 143, 154);
+constexpr QColor kSurface(26, 27, 38);
+constexpr QColor kRaised(31, 32, 48);
+constexpr QColor kBase(22, 23, 32);
+constexpr QColor kSelection(60, 73, 110);
+
+const std::pair<QPalette::ColorRole, QColor> kFallback[] = {
+    {QPalette::Window, kSurface},
+    {QPalette::Base, kBase},
+    {QPalette::AlternateBase, kSurface},
+    {QPalette::Text, kText},
+    {QPalette::WindowText, kText},
+    {QPalette::ButtonText, kText},
+    {QPalette::Button, kRaised},
+    {QPalette::Highlight, kSelection},
+    {QPalette::HighlightedText, kText},
+    {QPalette::PlaceholderText, kMuted},
+    {QPalette::Link, kAccent},
+};
+
+struct Colours
+{
+    QColor accent;
+    QColor text;
+    QColor muted;
+    QColor surface;
+    QColor raised;
+    QColor base;
+    QColor backdrop;
+    QColor selection;
+    QColor onSelection;
+
+    bool operator==(const Colours &) const = default;
+};
+
+Colours current;
 
 const char *kStyleSheet = R"(
-QWidget { color: #f0f0f2; }
-QDialog, QMessageBox, QColorDialog, QFileDialog { background: #1a1b26; }
-QToolTip { background: #1a1b26; color: #f0f0f2; border: 1px solid rgba(122,162,247,110);
+QWidget { color: rgb($text); }
+QDialog, QMessageBox, QColorDialog, QFileDialog { background: rgb($surface); }
+QToolTip { background: rgb($surface); color: rgb($text); border: 1px solid rgba($accent,110);
            padding: 4px 8px; border-radius: 6px; }
-QLabel#caption { color: #7aa2f7; font-size: 11px; font-weight: 600; letter-spacing: 1.2px; padding-top: 6px; }
-QLabel#title { color: #8b8f9a; font-size: 13px; }
+QLabel#caption { color: rgb($accent); font-size: 11px; font-weight: 600; letter-spacing: 1.2px; padding-top: 6px; }
+QLabel#title { color: rgb($muted); font-size: 13px; }
 QLineEdit, QPlainTextEdit, QDateEdit {
-    background: rgba(255,255,255,16); border: 1px solid rgba(255,255,255,30); border-radius: 10px;
-    padding: 7px 12px; selection-background-color: rgba(122,162,247,110);
+    background: rgba($text,16); border: 1px solid rgba($text,30); border-radius: 10px;
+    padding: 7px 12px; selection-background-color: rgba($accent,110);
 }
-QLineEdit:focus, QPlainTextEdit:focus, QDateEdit:focus { border: 1px solid #7aa2f7; }
-QDateEdit:disabled { color: #5c6070; }
+QLineEdit:focus, QPlainTextEdit:focus, QDateEdit:focus { border: 1px solid rgb($accent); }
+QDateEdit:disabled { color: rgba($text,80); }
 QDateEdit::drop-down { border: none; width: 22px; }
 QPushButton {
-    background: rgba(255,255,255,14); border: 1px solid rgba(255,255,255,28); border-radius: 10px;
+    background: rgba($text,14); border: 1px solid rgba($text,28); border-radius: 10px;
     padding: 8px 18px;
 }
-QPushButton:hover { background: rgba(255,255,255,26); }
-QPushButton:disabled { color: #5c6070; }
-QPushButton#primary { background: rgba(122,162,247,70); border-color: rgba(122,162,247,170); font-weight: 600; }
-QPushButton#primary:hover { background: rgba(122,162,247,110); }
-QPushButton#primary:disabled { background: rgba(255,255,255,10); border-color: rgba(255,255,255,24); }
+QPushButton:hover { background: rgba($text,26); }
+QPushButton:disabled { color: rgba($text,80); }
+QPushButton#primary { background: rgba($accent,70); border-color: rgba($accent,170); font-weight: 600; }
+QPushButton#primary:hover { background: rgba($accent,110); }
+QPushButton#primary:disabled { background: rgba($text,10); border-color: rgba($text,24); }
 QPushButton#style { min-height: 46px; padding: 2px 14px; text-align: left; }
-QPushButton#style:checked { background: rgba(122,162,247,55); border: 1px solid #7aa2f7; }
-QPushButton#swatch { border-radius: 15px; border: 2px solid rgba(255,255,255,40); padding: 0; }
-QPushButton#swatch:checked { border: 3px solid #7aa2f7; }
+QPushButton#style:checked { background: rgba($accent,55); border: 1px solid rgb($accent); }
+QPushButton#swatch { border-radius: 15px; border: 2px solid rgba($text,40); padding: 0; }
+QPushButton#swatch:checked { border: 3px solid rgb($accent); }
 QPushButton#mode { background: transparent; border: none; border-radius: 8px; padding: 6px 18px;
-                   color: #8b8f9a; font-weight: 600; }
-QPushButton#mode:hover { color: #f0f0f2; }
-QPushButton#mode:checked { background: rgba(122,162,247,70); color: #f0f0f2; }
-QPushButton#mode:disabled { color: #4a4d5a; }
-QFrame#segment { background: rgba(255,255,255,12); border: 1px solid rgba(255,255,255,24); border-radius: 11px; }
-QFrame#bar { background: #1a1b26; border-bottom: 1px solid rgba(255,255,255,16); }
-QFrame#editbar { background: #16161f; border-bottom: 1px solid rgba(255,255,255,12); }
-QFrame#floatbar { background: #1f2030; border: 1px solid rgba(255,255,255,30); border-radius: 12px; }
-QLabel#hint { color: #8b8f9a; }
+                   color: rgb($muted); font-weight: 600; }
+QPushButton#mode:hover { color: rgb($text); }
+QPushButton#mode:checked { background: rgba($accent,70); color: rgb($text); }
+QPushButton#mode:disabled { color: rgba($text,56); }
+QFrame#segment { background: rgba($text,12); border: 1px solid rgba($text,24); border-radius: 11px; }
+QFrame#bar { background: rgb($surface); border-bottom: 1px solid rgba($text,16); }
+QFrame#editbar { background: rgb($base); border-bottom: 1px solid rgba($text,12); }
+QFrame#floatbar { background: rgb($raised); border: 1px solid rgba($text,30); border-radius: 12px; }
+QLabel#hint { color: rgb($muted); }
 QToolButton#file { background: transparent; border: none; border-radius: 8px; padding: 6px 12px; font-weight: 600; }
-QToolButton#file:hover, QToolButton#file:open { background: rgba(255,255,255,20); }
+QToolButton#file:hover, QToolButton#file:open { background: rgba($text,20); }
 QToolButton#file::menu-indicator { image: none; }
 QToolButton#tool { background: transparent; border: none; border-radius: 8px; padding: 6px; }
-QToolButton#tool:hover { background: rgba(255,255,255,20); }
-QToolButton#tool:checked { background: rgba(122,162,247,70); }
-QFrame#divider { background: rgba(255,255,255,24); margin: 0 6px; }
-QMenu { background: #1f2030; border: 1px solid rgba(255,255,255,26); border-radius: 10px; padding: 6px; }
+QToolButton#tool:hover { background: rgba($text,20); }
+QToolButton#tool:checked { background: rgba($accent,70); }
+QFrame#divider { background: rgba($text,24); margin: 0 6px; }
+QMenu { background: rgb($raised); border: 1px solid rgba($text,26); border-radius: 10px; padding: 6px; }
 QMenu::item { padding: 7px 28px 7px 14px; border-radius: 6px; }
-QMenu::item:selected { background: rgba(122,162,247,80); }
-QMenu::item:disabled { color: #5c6070; }
-QMenu::separator { height: 1px; background: rgba(255,255,255,20); margin: 5px 8px; }
-QCheckBox::indicator { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba(255,255,255,60);
-                       background: rgba(255,255,255,10); }
-QCheckBox::indicator:checked { background: #7aa2f7; border-color: #7aa2f7; }
-QSlider::groove:horizontal { height: 4px; background: rgba(255,255,255,30); border-radius: 2px; }
-QSlider::sub-page:horizontal { background: #7aa2f7; border-radius: 2px; }
-QSlider::handle:horizontal { background: #f0f0f2; width: 16px; height: 16px; margin: -6px 0; border-radius: 8px; }
+QMenu::item:selected { background: rgb($selection); color: rgb($onselection); }
+QMenu::item:disabled { color: rgba($text,80); }
+QMenu::separator { height: 1px; background: rgba($text,20); margin: 5px 8px; }
+QCheckBox::indicator { width: 16px; height: 16px; border-radius: 5px; border: 1px solid rgba($text,60);
+                       background: rgba($text,10); }
+QCheckBox::indicator:checked { background: rgb($accent); border-color: rgb($accent); }
+QSlider::groove:horizontal { height: 4px; background: rgba($text,30); border-radius: 2px; }
+QSlider::sub-page:horizontal { background: rgb($accent); border-radius: 2px; }
+QSlider::handle:horizontal { background: rgb($text); width: 16px; height: 16px; margin: -6px 0; border-radius: 8px; }
 )";
 
+const char *kSwatch = "QToolButton { background: %1; border-radius: 9px; min-width: 18px;"
+                      " min-height: 18px; border: 2px solid %2; }";
+const char *kStrike = "qlineargradient(x1:0, y1:1, x2:1, y2:0, stop:0 transparent, stop:0.44 transparent,"
+                      " stop:0.46 %1, stop:0.54 %1, stop:0.56 transparent, stop:1 transparent)";
+
+QPalette fallback()
+{
+    QPalette palette;
+    for (const auto &[role, colour] : kFallback)
+        palette.setColor(role, colour);
+    return palette;
+}
+
+bool dark(const QPalette &palette)
+{
+    return palette.color(QPalette::Window).lightness() < palette.color(QPalette::WindowText).lightness();
+}
+
+Colours coloursOf(const QPalette &palette)
+{
+    const QColor base = palette.color(QPalette::Base);
+    return {
+        .accent = palette.color(QPalette::Link),
+        .text = palette.color(QPalette::WindowText),
+        .muted = palette.color(QPalette::PlaceholderText),
+        .surface = palette.color(QPalette::Window),
+        .raised = palette.color(QPalette::Button),
+        .base = base,
+        .backdrop = base.darker(kBackdropDarken),
+        .selection = palette.color(QPalette::Highlight),
+        .onSelection = palette.color(QPalette::HighlightedText),
+    };
+}
+
+QString channels(const QColor &colour)
+{
+    return QStringLiteral("%1,%2,%3").arg(colour.red()).arg(colour.green()).arg(colour.blue());
+}
+
+QString swatch(const QString &background)
+{
+    return QString::fromLatin1(kSwatch).arg(background, faded(current.text, kRingAlpha).name(QColor::HexArgb));
+}
+
+QString styleSheet(const Colours &colours)
+{
+    const std::pair<QString, QColor> tokens[] = {
+        {QStringLiteral("$accent"), colours.accent},
+        {QStringLiteral("$text"), colours.text},
+        {QStringLiteral("$muted"), colours.muted},
+        {QStringLiteral("$surface"), colours.surface},
+        {QStringLiteral("$raised"), colours.raised},
+        {QStringLiteral("$base"), colours.base},
+        {QStringLiteral("$selection"), colours.selection},
+        {QStringLiteral("$onselection"), colours.onSelection},
+    };
+    QString sheet = QString::fromLatin1(kStyleSheet);
+    for (const auto &[token, colour] : tokens)
+        sheet.replace(token, channels(colour));
+    return sheet;
+}
+
+void follow(QApplication &app)
+{
+    const QPalette palette = app.palette();
+    if (!dark(palette)) {
+        // Re-enters through the palette event.
+        app.setPalette(fallback());
+        return;
+    }
+    const Colours fresh = coloursOf(palette);
+    if (fresh == current)
+        return;
+    current = fresh;
+    app.setStyleSheet(styleSheet(current));
+}
+
+// Restyles on every palette change.
+class Follower : public QObject
+{
+public:
+    using QObject::QObject;
+
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() == QEvent::ApplicationPaletteChange && watched == qApp)
+            follow(*qApp);
+        return false;
+    }
+};
+
 } // namespace
+
+QColor accent()
+{
+    return current.accent;
+}
+
+QColor text()
+{
+    return current.text;
+}
+
+QColor muted()
+{
+    return current.muted;
+}
+
+QColor surface()
+{
+    return current.surface;
+}
+
+QColor backdrop()
+{
+    return current.backdrop;
+}
 
 void apply(QApplication &app)
 {
     app.setStyle(QStringLiteral("Fusion"));
-    QPalette palette;
-    palette.setColor(QPalette::Window, surface);
-    palette.setColor(QPalette::Base, QColor(22, 23, 32));
-    palette.setColor(QPalette::AlternateBase, surface);
-    palette.setColor(QPalette::Text, text);
-    palette.setColor(QPalette::WindowText, text);
-    palette.setColor(QPalette::ButtonText, text);
-    palette.setColor(QPalette::Button, surface);
-    palette.setColor(QPalette::Highlight, accent);
-    palette.setColor(QPalette::HighlightedText, backdrop);
-    palette.setColor(QPalette::PlaceholderText, muted);
-    app.setPalette(palette);
     QFont font = app.font();
     font.setPixelSize(13);
     app.setFont(font);
-    app.setStyleSheet(QString::fromLatin1(kStyleSheet));
+    app.installEventFilter(new Follower(&app));
+    follow(app);
 }
 
 QLabel *caption(const QString &text)
@@ -104,9 +252,12 @@ QLabel *caption(const QString &text)
 
 void paintInk(QAbstractButton *button, const QColor &colour)
 {
-    button->setStyleSheet(QStringLiteral("QToolButton { background: %1; border-radius: 9px; min-width: 18px;"
-                                         " min-height: 18px; border: 2px solid rgba(255,255,255,70); }")
-                              .arg(colour.name()));
+    button->setStyleSheet(swatch(colour.name()));
+}
+
+void paintHollow(QAbstractButton *button)
+{
+    button->setStyleSheet(swatch(QString::fromLatin1(kStrike).arg(danger.name())));
 }
 
 void lift(QWidget *panel)

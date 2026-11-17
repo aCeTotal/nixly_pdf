@@ -219,7 +219,7 @@ void PageView::resizeEvent(QResizeEvent *)
 void PageView::paintEvent(QPaintEvent *)
 {
     QPainter painter(this);
-    painter.fillRect(rect(), theme::backdrop);
+    painter.fillRect(rect(), theme::backdrop());
     if (!doc || !layout.count()) {
         paintEmpty(painter);
         return;
@@ -264,8 +264,8 @@ void PageView::paintOverlays(QPainter &painter)
 {
     painter.setRenderHint(QPainter::Antialiasing);
     for (size_t i = 0; hovered && i < hovered->passage.outlines.size(); ++i) {
-        painter.setPen(QPen(theme::accent, 1.5));
-        painter.setBrush(theme::faded(theme::accent, 28));
+        painter.setPen(QPen(theme::accent(), 1.5));
+        painter.setBrush(theme::faded(theme::accent(), 28));
         painter.drawRoundedRect(toView(hovered->index, hovered->passage.outlines[i]).adjusted(-3, -2, 3, 2), 4, 4);
     }
     paintSelection(painter);
@@ -279,18 +279,18 @@ void PageView::paintEmpty(QPainter &painter)
     painter.setRenderHint(QPainter::Antialiasing);
     QRectF card(QPointF(), kEmptyCard);
     card.moveCenter(QRectF(rect()).center());
-    painter.setPen(QPen(theme::faded(theme::accent, 120), 1.5, Qt::DashLine));
-    painter.setBrush(theme::faded(theme::surface, 200));
+    painter.setPen(QPen(theme::faded(theme::accent(), 120), 1.5, Qt::DashLine));
+    painter.setBrush(theme::faded(theme::surface(), 200));
     painter.drawRoundedRect(card, 18, 18);
     QFont font = painter.font();
     font.setPixelSize(18);
     font.setWeight(QFont::DemiBold);
     painter.setFont(font);
-    painter.setPen(theme::text);
+    painter.setPen(theme::text());
     painter.drawText(card.adjusted(0, 0, 0, -30), Qt::AlignCenter, tr("Drop a PDF here"));
     font.setPixelSize(13);
     font.setWeight(QFont::Normal);
     painter.setFont(font);
-    painter.setPen(theme::muted);
+    painter.setPen(theme::muted());
     painter.drawText(card.adjusted(0, 40, 0, 0), Qt::AlignCenter, tr("or choose File ▸ Open  (Ctrl+O)"));
 }

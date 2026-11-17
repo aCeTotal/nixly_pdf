@@ -25,8 +25,8 @@ void CalloutEditor::open(const Mark &mark, double zoom)
     current = mark;
     setStyleSheet(QStringLiteral("QPlainTextEdit { background: transparent; color: %1; border: 1.5px dashed %2;"
                                  " border-radius: 4px; selection-background-color: %3; }")
-                      .arg(mark.ink.name(), theme::accent.name(),
-                           theme::faded(theme::accent, 90).name(QColor::HexArgb)));
+                      .arg(mark.ink.name(), theme::accent().name(),
+                           theme::faded(theme::accent(), 90).name(QColor::HexArgb)));
     QFont face(kCalloutFamily);
     face.setPixelSize(std::max(1, qRound(mark.size * zoom)));
     setFont(face);
